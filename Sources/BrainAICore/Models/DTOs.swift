@@ -348,7 +348,93 @@ public struct CPUStats: Codable, Sendable {
     }
 }
 
-// MARK: - Helper Types
+// MARK: - Graph Visualization DTOs
+
+/// Response from graph labels endpoint
+public struct GraphLabelsResponse: Codable, Sendable {
+    public let entityLabels: [String]
+    public let relationLabels: [String]
+
+    public init(entityLabels: [String], relationLabels: [String]) {
+        self.entityLabels = entityLabels
+        self.relationLabels = relationLabels
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case entityLabels = "entity_labels"
+        case relationLabels = "relation_labels"
+    }
+}
+
+/// Node data returned from graph search
+public struct GraphNodeData: Codable, Sendable {
+    public let name: String
+    public let type: String?
+    public let description: String?
+    public let degree: Int?
+
+    public init(name: String, type: String? = nil, description: String? = nil, degree: Int? = nil) {
+        self.name = name
+        self.type = type
+        self.description = description
+        self.degree = degree
+    }
+}
+
+/// Edge data returned from graph search
+public struct GraphEdgeData: Codable, Sendable {
+    public let source: String
+    public let target: String
+    public let description: String?
+    public let keywords: String?
+
+    public init(source: String, target: String, description: String? = nil, keywords: String? = nil) {
+        self.source = source
+        self.target = target
+        self.description = description
+        self.keywords = keywords
+    }
+}
+
+/// Response from graph search endpoint
+public struct GraphSearchResponse: Codable, Sendable {
+    public let nodes: [GraphNodeData]
+    public let edges: [GraphEdgeData]
+
+    public init(nodes: [GraphNodeData], edges: [GraphEdgeData]) {
+        self.nodes = nodes
+        self.edges = edges
+    }
+}
+
+/// Structured query response with raw data
+public struct QueryDataResponse: Codable, Sendable {
+    public let entities: [GraphNodeData]?
+    public let relations: [GraphEdgeData]?
+    public let chunks: [ChunkData]?
+
+    public init(entities: [GraphNodeData]? = nil, relations: [GraphEdgeData]? = nil, chunks: [ChunkData]? = nil) {
+        self.entities = entities
+        self.relations = relations
+        self.chunks = chunks
+    }
+}
+
+/// A text chunk from the knowledge base
+public struct ChunkData: Codable, Sendable {
+    public let content: String
+    public let sourceId: String?
+
+    public init(content: String, sourceId: String? = nil) {
+        self.content = content
+        self.sourceId = sourceId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case content
+        case sourceId = "source_id"
+    }
+}
 
 // MARK: - Ollama DTOs
 

@@ -648,3 +648,119 @@ final class BrainAICoreTests: XCTestCase {
         XCTAssertEqual(options.contextWindow, 4096)
     }
 }
+
+// MARK: - Graph DTO Tests
+
+final class GraphDTOTests: XCTestCase {
+    func testGraphLabelsResponseEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = GraphLabelsResponse(
+            entityLabels: ["Person", "Organization", "Concept"],
+            relationLabels: ["works_at", "knows", "related_to"]
+        )
+
+        let data = try encoder.encode(original)
+
+        // Verify JSON has snake_case keys from explicit CodingKeys
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            XCTAssertNotNil(json["entity_labels"])
+            XCTAssertNotNil(json["relation_labels"])
+        }
+
+        let decoded = try decoder.decode(GraphLabelsResponse.self, from: data)
+        XCTAssertEqual(original.entityLabels, decoded.entityLabels)
+        XCTAssertEqual(original.relationLabels, decoded.relationLabels)
+    }
+
+    func testGraphNodeDataEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = GraphNodeData(name: "Machine Learning", type: "Concept",
+                                     description: "A subset of AI", degree: 5)
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(GraphNodeData.self, from: data)
+
+        XCTAssertEqual(original.name, decoded.name)
+        XCTAssertEqual(original.type, decoded.type)
+        XCTAssertEqual(original.description, decoded.description)
+        XCTAssertEqual(original.degree, decoded.degree)
+    }
+
+    func testGraphEdgeDataEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = GraphEdgeData(source: "NodeA", target: "NodeB",
+                                     description: "related to", keywords: "relation,test")
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(GraphEdgeData.self, from: data)
+
+        XCTAssertEqual(original.source, decoded.source)
+        XCTAssertEqual(original.target, decoded.target)
+        XCTAssertEqual(original.description, decoded.description)
+        XCTAssertEqual(original.keywords, decoded.keywords)
+    }
+
+    func testGraphSearchResponseEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = GraphSearchResponse(
+            nodes: [
+                GraphNodeData(name: "AI", type: "Concept"),
+                GraphNodeData(name: "ML", type: "Concept")
+            ],
+            edges: [
+                GraphEdgeData(source: "AI", target: "ML", description: "includes")
+            ]
+        )
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(GraphSearchResponse.self, from: data)
+
+        XCTAssertEqual(decoded.nodes.count, 2)
+        XCTAssertEqual(decoded.edges.count, 1)
+        XCTAssertEqual(decoded.nodes[0].name, "AI")
+        XCTAssertEqual(decoded.edges[0].source, "AI")
+    }
+
+    func testQueryDataResponseEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = QueryDataResponse(
+            entities: [GraphNodeData(name: "Entity1", type: "Type1")],
+            relations: [GraphEdgeData(source: "Entity1", target: "Entity2", description: "linked")],
+            chunks: [ChunkData(content: "Some text chunk", sourceId: "doc-1")]
+        )
+
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(QueryDataResponse.self, from: data)
+
+        XCTAssertEqual(decoded.entities?.count, 1)
+        XCTAssertEqual(decoded.relations?.count, 1)
+        XCTAssertEqual(decoded.chunks?.count, 1)
+        XCTAssertEqual(decoded.chunks?[0].content, "Some text chunk")
+        XCTAssertEqual(decoded.chunks?[0].sourceId, "doc-1")
+    }
+
+    func testChunkDataEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = ChunkData(content: "Test content", sourceId: "src-123")
+        let data = try encoder.encode(original)
+
+        // Verify snake_case from CodingKeys
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            XCTAssertNotNil(json["source_id"])
+        }
+
+        let decoded = try decoder.decode(ChunkData.self, from: data)
+        XCTAssertEqual(original.content, decoded.content)
+        XCTAssertEqual(original.sourceId, decoded.sourceId)
+    }
+}

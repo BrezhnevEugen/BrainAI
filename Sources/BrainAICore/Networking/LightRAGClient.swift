@@ -36,6 +36,18 @@ public protocol LightRAGClientProtocol: Sendable {
 
     /// Check health of LightRAG service
     func healthCheck() async throws -> HealthResponse
+
+    /// Get all graph labels (entity types and relation types)
+    func getGraphLabels() async throws -> GraphLabelsResponse
+
+    /// Search graph nodes by label/type
+    func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse
+
+    /// Get entity details by name
+    func getEntity(_ name: String) async throws -> GraphNodeData
+
+    /// Query knowledge base returning structured data (entities, relations, chunks)
+    func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse
 }
 
 // MARK: - Local LightRAG Client
@@ -114,6 +126,39 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
     public func healthCheck() async throws -> HealthResponse {
         return try await httpClient.get("/health")
     }
+
+    public func getGraphLabels() async throws -> GraphLabelsResponse {
+        return try await httpClient.get("/api/graph/labels")
+    }
+
+    public func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse {
+        var params: [String: String] = [
+            "label": label,
+            "max_items": String(maxItems)
+        ]
+        if !searchText.isEmpty {
+            params["search_text"] = searchText
+        }
+        return try await httpClient.get("/api/graph/search", queryParameters: params)
+    }
+
+    public func getEntity(_ name: String) async throws -> GraphNodeData {
+        return try await httpClient.get("/api/graph/entity", queryParameters: ["name": name])
+    }
+
+    public func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse {
+        struct QueryDataRequest: Encodable {
+            let question: String
+            let mode: SearchMode
+            let topK: Int
+            enum CodingKeys: String, CodingKey {
+                case question, mode
+                case topK = "top_k"
+            }
+        }
+        let request = QueryDataRequest(question: question, mode: mode, topK: topK)
+        return try await httpClient.post("/api/query/data", body: request)
+    }
 }
 
 // MARK: - Remote LightRAG Client
@@ -190,5 +235,38 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
 
     public func healthCheck() async throws -> HealthResponse {
         return try await httpClient.get("/health")
+    }
+
+    public func getGraphLabels() async throws -> GraphLabelsResponse {
+        return try await httpClient.get("/api/graph/labels")
+    }
+
+    public func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse {
+        var params: [String: String] = [
+            "label": label,
+            "max_items": String(maxItems)
+        ]
+        if !searchText.isEmpty {
+            params["search_text"] = searchText
+        }
+        return try await httpClient.get("/api/graph/search", queryParameters: params)
+    }
+
+    public func getEntity(_ name: String) async throws -> GraphNodeData {
+        return try await httpClient.get("/api/graph/entity", queryParameters: ["name": name])
+    }
+
+    public func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse {
+        struct QueryDataRequest: Encodable {
+            let question: String
+            let mode: SearchMode
+            let topK: Int
+            enum CodingKeys: String, CodingKey {
+                case question, mode
+                case topK = "top_k"
+            }
+        }
+        let request = QueryDataRequest(question: question, mode: mode, topK: topK)
+        return try await httpClient.post("/api/query/data", body: request)
     }
 }

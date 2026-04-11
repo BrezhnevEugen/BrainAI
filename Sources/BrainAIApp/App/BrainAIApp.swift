@@ -5,6 +5,7 @@ import BrainAICore
 
 enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
     case dashboard
+    case graph
     case chat
     case search
     case notes
@@ -15,6 +16,7 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .dashboard: "Dashboard"
+        case .graph: "Knowledge Graph"
         case .chat: "Chat"
         case .search: "Search"
         case .notes: "Notes"
@@ -25,6 +27,7 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .dashboard: "house"
+        case .graph: "point.3.connected.trianglepath.dotted"
         case .chat: "bubble.left.and.bubble.right"
         case .search: "magnifyingglass"
         case .notes: "note.text"
@@ -83,6 +86,8 @@ struct BrainAIApp: App {
         switch selectedTab {
         case .dashboard:
             DashboardView()
+        case .graph:
+            KnowledgeGraphView()
         case .chat:
             ChatView()
         case .search:

@@ -24,9 +24,14 @@ let package = Package(
             name: "BrainAIApp",
             targets: ["BrainAIApp"]
         ),
+        .executable(
+            name: "BrainAIInstaller",
+            targets: ["BrainAIInstaller"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess.git", from: "4.2.2"),
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.6.0"),
     ],
     targets: [
         // MARK: - Core Library
@@ -34,6 +39,7 @@ let package = Package(
             name: "BrainAICore",
             dependencies: [
                 "KeychainAccess",
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/BrainAICore"
         ),
@@ -57,6 +63,13 @@ let package = Package(
             name: "BrainAIApp",
             dependencies: ["BrainAICore"],
             path: "Sources/BrainAIApp"
+        ),
+
+        // MARK: - Installer / Setup Wizard
+        .executableTarget(
+            name: "BrainAIInstaller",
+            dependencies: ["BrainAICore"],
+            path: "Sources/BrainAIInstaller"
         ),
 
         // MARK: - Tests
