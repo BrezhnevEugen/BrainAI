@@ -1,0 +1,76 @@
+%% BrainAI — LightRAG Processing Pipeline
+%% ========================================
+
+%% DIAGRAM 2: Provider Roles Pipeline
+%% ====================================
+
+---
+title: LightRAG Processing Pipeline — 4 Provider Roles
+---
+flowchart TB
+    subgraph Indexing ["INDEXING (Document Insertion)"]
+        direction TB
+        DocIn["Document Input<br/><i>Text, Markdown, PDF</i>"]
+        Chunk["Chunking<br/><i>Split into chunks<br/>size: 1200, overlap: 100</i>"]
+
+        DocIn --> Chunk
+
+        subgraph EmbedIdx ["Role 1: EMBEDDING"]
+            EmbModel1["Embedding Model<br/><i>bge-m3 / text-embedding-3-small</i>"]
+        end
+
+        subgraph Extract ["Role 2: LLM EXTRACTION"]
+            ExtModel["Extraction LLM<br/><i>qwen2.5:32b / gpt-4o</i><br/><b>Quality-critical, 32B+ recommended</b>"]
+        end
+
+        Chunk --> EmbModel1
+        Chunk --> ExtModel
+
+        EmbModel1 --> VecStore[("Vector Storage<br/><i>Local</i>")]
+        ExtModel --> |"entities + relations"| GraphStore[("Graph Storage<br/><i>Local</i>")]
+        Chunk --> DocStore[("Document Store<br/><i>Local</i>")]
+    end
+
+    subgraph Query ["QUERY (Retrieval + Generation)"]
+        direction TB
+        UserQ["User Query"]
+
+        subgraph EmbedQ ["Role 1: EMBEDDING (same model)"]
+            EmbModel2["Embedding Model<br/><i>Must match indexing model!</i>"]
+        end
+
+        UserQ --> EmbModel2
+        EmbModel2 --> VecSearch["Vector Similarity<br/>Search"]
+        UserQ --> GraphSearch["Graph<br/>Traversal"]
+
+        VecSearch --> Retrieved["Retrieved Context<br/><i>Chunks + Entities + Relations</i>"]
+        GraphSearch --> Retrieved
+
+        subgraph Rerank ["Role 3: RERANKER (optional)"]
+            RerModel["Reranker<br/><i>Jina / Cohere API</i><br/>Re-ranks by relevance"]
+        end
+
+        Retrieved --> RerModel
+        RerModel --> BestCtx["Top-K Context"]
+
+        subgraph Generate ["Role 4: LLM GENERATION"]
+            GenModel["Generation LLM<br/><i>qwen2.5:14b / gpt-4o-mini</i><br/>Can be lighter than extraction"]
+        end
+
+        BestCtx --> GenModel
+        GenModel --> Answer["Final Answer"]
+    end
+
+    classDef role1 fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef role2 fill:#E74C3C,stroke:#C0392B,color:#fff
+    classDef role3 fill:#F39C12,stroke:#D68910,color:#fff
+    classDef role4 fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef storage fill:#8E44AD,stroke:#6C3483,color:#fff
+    classDef process fill:#5D6D7E,stroke:#2C3E50,color:#fff
+
+    class EmbModel1,EmbModel2 role1
+    class ExtModel role2
+    class RerModel role3
+    class GenModel role4
+    class VecStore,GraphStore,DocStore storage
+    class Chunk,VecSearch,GraphSearch,Retrieved,BestCtx,Answer process

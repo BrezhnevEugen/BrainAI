@@ -1,0 +1,128 @@
+%% BrainAI — Deployment Variants
+%% ===============================
+
+%% DIAGRAM 3: 5 Deployment Configurations
+%% ========================================
+
+---
+title: "Variant A: All Local (MacBook)"
+---
+flowchart LR
+    subgraph MacBook ["MacBook (everything here)"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG Server<br/>:9621"]
+        OL["Ollama<br/>:11434"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+
+        UI <--> LR
+        LR <--> OL
+        LR --> ST
+    end
+
+    classDef local fill:#27AE60,stroke:#1E8449,color:#fff
+    class UI,LR,OL,ST local
+
+---
+title: "Variant B: Remote Ollama (GPU Server in LAN)"
+---
+flowchart LR
+    subgraph MacBook ["MacBook"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG Server<br/>:9621"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        UI <--> LR
+        LR --> ST
+    end
+
+    subgraph GPU ["GPU Server (LAN / VPN)"]
+        OL["Ollama<br/>:11434<br/><i>qwen2.5:32b<br/>bge-m3</i>"]
+    end
+
+    LR <-->|"HTTP API<br/>192.168.x.x:11434"| OL
+
+    classDef local fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef remote fill:#E67E22,stroke:#D35400,color:#fff
+    class UI,LR,ST local
+    class OL remote
+
+---
+title: "Variant C: Cloud API (OpenAI / DeepSeek)"
+---
+flowchart LR
+    subgraph MacBook ["MacBook"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG Server<br/>:9621"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        UI <--> LR
+        LR --> ST
+    end
+
+    subgraph Cloud ["Cloud Providers"]
+        OAI["OpenAI API<br/><i>gpt-4o (extraction)<br/>text-embedding-3-small</i>"]
+        DS["DeepSeek API<br/><i>deepseek-chat (generation)</i>"]
+    end
+
+    LR <-->|"HTTPS"| OAI
+    LR <-->|"HTTPS"| DS
+
+    classDef local fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef cloud fill:#E74C3C,stroke:#C0392B,color:#fff
+    class UI,LR,ST local
+    class OAI,DS cloud
+
+---
+title: "Variant D: Hybrid (Local + Remote + Cloud)"
+---
+flowchart LR
+    subgraph MacBook ["MacBook"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG Server<br/>:9621"]
+        OL_L["Ollama Local<br/><i>qwen2.5:14b<br/>(generation)</i>"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        UI <--> LR
+        LR <--> OL_L
+        LR --> ST
+    end
+
+    subgraph GPU ["GPU Server"]
+        OL_R["Ollama Remote<br/><i>bge-m3<br/>(embedding)</i>"]
+    end
+
+    subgraph Cloud ["Cloud"]
+        OAI["OpenAI API<br/><i>gpt-4o<br/>(extraction)</i>"]
+        JN["Jina API<br/><i>(reranker)</i>"]
+    end
+
+    LR <-->|"LAN"| OL_R
+    LR <-->|"HTTPS"| OAI
+    LR <-->|"HTTPS"| JN
+
+    classDef local fill:#27AE60,stroke:#1E8449,color:#fff
+    classDef remote fill:#E67E22,stroke:#D35400,color:#fff
+    classDef cloud fill:#E74C3C,stroke:#C0392B,color:#fff
+    class UI,LR,OL_L,ST local
+    class OL_R remote
+    class OAI,JN cloud
+
+---
+title: "Variant E: Remote LightRAG (Thin Client)"
+---
+flowchart LR
+    subgraph MacBook ["MacBook (Thin Client)"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+    end
+
+    subgraph Server ["Remote Server"]
+        LR["LightRAG Server<br/>:9621"]
+        OL["Ollama<br/>:11434"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        LR <--> OL
+        LR --> ST
+    end
+
+    UI <-->|"REST API / MCP<br/>Bearer Auth + TLS"| LR
+
+    classDef client fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef server fill:#E67E22,stroke:#D35400,color:#fff
+    class UI client
+    class LR,OL,ST server

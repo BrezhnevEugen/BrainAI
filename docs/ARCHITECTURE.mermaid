@@ -1,0 +1,91 @@
+%% BrainAI Architecture Diagrams
+%% ================================
+
+%% DIAGRAM 1: High-Level Ecosystem
+%% ================================
+
+---
+title: BrainAI Ecosystem — High-Level Architecture
+---
+flowchart TB
+    subgraph UI ["UI Layer (Swift/SwiftUI)"]
+        direction LR
+        Tray["<b>Tray Agent</b><br/>Menu Bar<br/>AppKit + SwiftUI<br/><i>Status, RAM, Quick Actions</i>"]
+        Settings["<b>Settings</b><br/>SwiftUI<br/><i>Providers, Roles,<br/>Server, Domains</i>"]
+        MainUI["<b>Main UI</b><br/>SwiftUI<br/><i>Graph, Chat, Search,<br/>Notes, Documents</i>"]
+        Installer["<b>Installer</b><br/>SwiftUI Wizard<br/><i>Setup, Download,<br/>Configure</i>"]
+    end
+
+    subgraph XPC ["IPC Layer"]
+        XPCService["<b>XPC Services</b><br/>Inter-process communication<br/><i>Shared state, notifications</i>"]
+    end
+
+    subgraph Core ["BrainAICore (Swift Package)"]
+        direction TB
+        subgraph CoreNet ["Networking"]
+            REST["REST Client<br/><i>LightRAG API</i>"]
+            WS["WebSocket<br/><i>Real-time events</i>"]
+        end
+        subgraph CoreProv ["Provider Registry"]
+            EmbProv["Embedding<br/>Provider"]
+            ExtProv["Extraction<br/>LLM Provider"]
+            RerProv["Reranker<br/>Provider"]
+            GenProv["Generation<br/>LLM Provider"]
+        end
+        subgraph CoreData ["Data Layer"]
+            Models["SwiftData<br/>Models"]
+            Config["Configuration<br/><i>UserDefaults</i>"]
+            Keychain["Security<br/><i>Keychain</i>"]
+        end
+        subgraph CoreMgmt ["Management"]
+            ProcMgr["Process<br/>Manager"]
+            MCPBridge["MCP<br/>Bridge"]
+            SysMon["System<br/>Monitor"]
+        end
+    end
+
+    subgraph Backend ["Backend Services (Managed Processes)"]
+        direction LR
+        LightRAG["<b>LightRAG Server</b><br/>Python / FastAPI<br/>port 9621<br/><i>Graph + Vector + Chunks</i>"]
+        Ollama["<b>Ollama</b><br/>Local LLM Runtime<br/>port 11434<br/><i>Models on device</i>"]
+    end
+
+    subgraph Storage ["Local Storage (always on device)"]
+        direction LR
+        GraphDB[("Graph<br/>Storage")]
+        VectorDB[("Vector<br/>Storage")]
+        DocStore[("Document<br/>Store")]
+        Cache[("SwiftData<br/>Cache")]
+    end
+
+    subgraph External ["External Connections (optional)"]
+        direction LR
+        OpenAI["OpenAI API<br/><i>GPT-4o, Embeddings</i>"]
+        Anthropic["Anthropic API<br/><i>Claude</i>"]
+        DeepSeek["DeepSeek API<br/><i>DeepSeek-V3</i>"]
+        Jina["Jina AI<br/><i>Reranker</i>"]
+        Cohere["Cohere<br/><i>Reranker</i>"]
+        RemoteOllama["Remote Ollama<br/><i>GPU Server</i>"]
+        RemoteLightRAG["Remote LightRAG<br/><i>REST / MCP</i>"]
+    end
+
+    UI --> XPC
+    XPC --> Core
+    Core --> Backend
+    Core --> External
+    Backend --> Storage
+    ProcMgr --> LightRAG
+    ProcMgr --> Ollama
+    MCPBridge --> RemoteLightRAG
+
+    classDef uiStyle fill:#4A90D9,stroke:#2C5F8A,color:#fff
+    classDef coreStyle fill:#50B86C,stroke:#2D7A42,color:#fff
+    classDef backendStyle fill:#E8A838,stroke:#B07D20,color:#fff
+    classDef storageStyle fill:#9B6DB7,stroke:#6D4A82,color:#fff
+    classDef externalStyle fill:#D9534F,stroke:#A33B38,color:#fff
+
+    class Tray,Settings,MainUI,Installer uiStyle
+    class REST,WS,EmbProv,ExtProv,RerProv,GenProv,Models,Config,Keychain,ProcMgr,MCPBridge,SysMon coreStyle
+    class LightRAG,Ollama backendStyle
+    class GraphDB,VectorDB,DocStore,Cache storageStyle
+    class OpenAI,Anthropic,DeepSeek,Jina,Cohere,RemoteOllama,RemoteLightRAG externalStyle

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainAI Architecture Diagrams</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 2rem;
+        }
+        h1 { font-size: 2rem; font-weight: 700; color: #58a6ff; margin-bottom: 0.5rem; }
+        .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: 0.95rem; }
+        .diagram-section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .diagram-section h2 { color: #f0f6fc; font-size: 1.3rem; margin-bottom: 0.5rem; }
+        .diagram-section .desc { color: #8b949e; font-size: 0.9rem; margin-bottom: 1.5rem; line-height: 1.5; }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+        .nav { display: flex; gap: 0.75rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .nav a {
+            color: #58a6ff; text-decoration: none;
+            padding: 0.4rem 1rem; border: 1px solid #30363d;
+            border-radius: 6px; font-size: 0.85rem; transition: all 0.2s;
+        }
+        .nav a:hover { background: #1f2937; border-color: #58a6ff; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { text-align: left; padding: 0.6rem 1rem; border: 1px solid #30363d; font-size: 0.85rem; }
+        th { background: #1c2128; color: #f0f6fc; }
+        td { color: #c9d1d9; }
+        .role-1 { color: #3498DB; font-weight: 600; }
+        .role-2 { color: #E74C3C; font-weight: 600; }
+        .role-3 { color: #F39C12; font-weight: 600; }
+        .role-4 { color: #27AE60; font-weight: 600; }
+        .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #30363d; }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>BrainAI Architecture</h1>
+    <p class="subtitle">Technical Specification v1.1 &mdash; April 2026</p>
+
+    <div class="nav">
+        <a href="#ecosystem">Ecosystem</a>
+        <a href="#pipeline">Pipeline</a>
+        <a href="#roles">Provider Roles</a>
+        <a href="#deploy-local">All Local</a>
+        <a href="#deploy-remote-ollama">Remote Ollama</a>
+        <a href="#deploy-cloud">Cloud API</a>
+        <a href="#deploy-hybrid">Hybrid</a>
+        <a href="#deploy-thin">Thin Client</a>
+        <a href="#workspaces">Workspaces</a>
+        <a href="#cross-query">Cross-Query</a>
+    </div>
+
+    <!-- 1. ECOSYSTEM -->
+    <div class="diagram-section" id="ecosystem">
+        <h2>1. BrainAI Ecosystem</h2>
+        <p class="desc">Modular architecture: 4 UI apps communicate via XPC through a shared Core library. Core manages backend processes and external connections.</p>
+        <pre class="mermaid">
+flowchart TB
+    subgraph UI_LAYER ["UI Layer - Swift / SwiftUI"]
+        direction LR
+        Tray["Tray Agent<br/>Menu Bar<br/>Status, RAM, Quick Actions"]
+        Settings["Settings<br/>Providers, Roles<br/>Server, Domains"]
+        MainUI["Main UI<br/>Graph, Chat, Search<br/>Notes, Documents"]
+        Installer["Installer<br/>Setup Wizard<br/>Download, Configure"]
+    end
+
+    XPC["XPC Services<br/>Inter-process Communication"]
+
+    subgraph CORE ["BrainAICore - Swift Package"]
+        direction LR
+        Net["Networking<br/>REST + WS"]
+        Prov["Provider<br/>Registry<br/>4 Roles"]
+        Data["SwiftData<br/>Models"]
+        Proc["Process<br/>Manager"]
+        MCPb["MCP<br/>Bridge"]
+        Sec["Keychain<br/>Security"]
+    end
+
+    subgraph BACKEND ["Backend Services - Managed"]
+        direction LR
+        LR["LightRAG Server<br/>Python / FastAPI<br/>port 9621"]
+        Ol["Ollama<br/>Local LLM<br/>port 11434"]
+    end
+
+    subgraph STORAGE ["Local Storage - Always On Device"]
+        direction LR
+        G[("Graph")]
+        V[("Vectors")]
+        D[("Docs")]
+        C[("Cache")]
+    end
+
+    subgraph EXT ["External - Optional"]
+        direction LR
+        OAI["OpenAI"]
+        Ant["Anthropic"]
+        DS["DeepSeek"]
+        JinaR["Jina"]
+        ROl["Remote<br/>Ollama"]
+        RLR["Remote<br/>LightRAG"]
+    end
+
+    UI_LAYER --> XPC
+    XPC --> CORE
+    CORE --> BACKEND
+    BACKEND --> STORAGE
+    CORE -.-> EXT
+    Proc --> LR
+    Proc --> Ol
+    MCPb -.-> RLR
+        </pre>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#4A90D9"></div> UI Layer</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#50B86C"></div> Core Library</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#E8A838"></div> Backend</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#9B6DB7"></div> Storage</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#D9534F"></div> External</div>
+        </div>
+    </div>
+
+    <!-- 2. PIPELINE -->
+    <div class="diagram-section" id="pipeline">
+        <h2>2. LightRAG Processing Pipeline</h2>
+        <p class="desc">Document insertion uses Embedding Role 1 + Extraction LLM Role 2. Queries use Embedding Role 1 + optional Reranker Role 3 + Generation LLM Role 4.</p>
+        <pre class="mermaid">
+flowchart TB
+    subgraph IDX ["INDEXING - Document Insertion"]
+        direction TB
+        Doc["Document Input<br/>Text, Markdown, PDF"]
+        Chunk["Chunking<br/>size 1200, overlap 100"]
+        Doc --> Chunk
+
+        Emb1["ROLE 1: EMBEDDING<br/>bge-m3 / text-embedding-3-small"]:::role1cls
+        ExtLLM["ROLE 2: LLM EXTRACTION<br/>qwen2.5:32b / gpt-4o<br/>32B+ recommended"]:::role2cls
+
+        Chunk --> Emb1
+        Chunk --> ExtLLM
+
+        VS1[("Vectors<br/>local")]
+        GS[("Graph<br/>local")]
+        DS1[("Docs<br/>local")]
+
+        Emb1 --> VS1
+        ExtLLM -->|"entities + relations"| GS
+        Chunk --> DS1
+    end
+
+    subgraph QRY ["QUERY - Retrieval + Generation"]
+        direction TB
+        Q["User Query"]
+
+        Emb2["ROLE 1: EMBEDDING<br/>same model as indexing"]:::role1cls
+        Q --> Emb2
+
+        VSrch["Vector Search"]
+        GSrch["Graph Traversal"]
+        Emb2 --> VSrch
+        Q --> GSrch
+
+        Ctx["Retrieved Context<br/>Chunks + Entities + Relations"]
+        VSrch --> Ctx
+        GSrch --> Ctx
+
+        Rer["ROLE 3: RERANKER<br/>optional<br/>Jina / Cohere API"]:::role3cls
+        Ctx --> Rer
+
+        Gen["ROLE 4: LLM GENERATION<br/>qwen2.5:14b / gpt-4o-mini<br/>Can be lighter than extraction"]:::role4cls
+        Rer --> Gen
+
+        Ans["Final Answer"]
+        Gen --> Ans
+    end
+
+    classDef role1cls fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef role2cls fill:#E74C3C,stroke:#C0392B,color:#fff
+    classDef role3cls fill:#F39C12,stroke:#D68910,color:#fff
+    classDef role4cls fill:#27AE60,stroke:#1E8449,color:#fff
+        </pre>
+    </div>
+
+    <!-- 3. ROLES TABLE -->
+    <div class="diagram-section" id="roles">
+        <h2>3. Provider Roles - Configuration Matrix</h2>
+        <p class="desc">Each role is independently configurable. Storage is always local. Compute is the users choice.</p>
+        <table>
+            <thead>
+                <tr><th>Role</th><th>Task</th><th>Requirements</th><th>Local Ollama</th><th>Remote Ollama</th><th>Cloud API</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="role-1">1. Embedding</td>
+                    <td>Text vectorization</td>
+                    <td>Fast, multilingual, stable dims</td>
+                    <td>bge-m3 (1024d)<br>nomic-embed-text (768d)</td>
+                    <td>bge-m3 @ GPU server</td>
+                    <td>OpenAI text-embedding-3-small</td>
+                </tr>
+                <tr>
+                    <td class="role-2">2. Extraction LLM</td>
+                    <td>Entity/relation extraction</td>
+                    <td>Quality over speed, 32B+</td>
+                    <td>qwen2.5:32b<br>qwen2.5:14b</td>
+                    <td>qwen2.5:32b @ GPU</td>
+                    <td>GPT-4o, DeepSeek-V3</td>
+                </tr>
+                <tr>
+                    <td class="role-3">3. Reranker</td>
+                    <td>Re-rank chunks (optional)</td>
+                    <td>Improves retrieval accuracy</td>
+                    <td>&mdash;</td>
+                    <td>BAAI/bge-reranker</td>
+                    <td>Jina Reranker, Cohere Rerank</td>
+                </tr>
+                <tr>
+                    <td class="role-4">4. Generation LLM</td>
+                    <td>Answer from context</td>
+                    <td>Balance speed/quality, 14B+</td>
+                    <td>qwen2.5:14b<br>qwen2.5:7b</td>
+                    <td>qwen2.5:14b @ GPU</td>
+                    <td>GPT-4o-mini, Claude Haiku</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3 style="margin-top:1.5rem; color:#f0f6fc;">Typical Configurations</h3>
+        <table>
+            <thead>
+                <tr><th>Scenario</th><th class="role-1">Embedding</th><th class="role-2">Extraction</th><th class="role-3">Reranker</th><th class="role-4">Generation</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>All Local 8GB</td><td>Ollama nomic-embed</td><td>Ollama qwen2.5:7b</td><td>&mdash;</td><td>Ollama qwen2.5:7b</td></tr>
+                <tr><td>All Local 36GB</td><td>Ollama bge-m3</td><td>Ollama qwen2.5:32b</td><td>&mdash;</td><td>Ollama qwen2.5:14b</td></tr>
+                <tr><td>Hybrid budget</td><td>Ollama bge-m3</td><td>DeepSeek chat</td><td>&mdash;</td><td>Ollama qwen2.5:14b</td></tr>
+                <tr><td>Hybrid quality</td><td>OpenAI embed-3-small</td><td>OpenAI gpt-4o</td><td>Jina</td><td>Ollama qwen2.5:14b</td></tr>
+                <tr><td>Full Cloud</td><td>OpenAI embed-3-small</td><td>OpenAI gpt-4o</td><td>Cohere</td><td>Anthropic Haiku</td></tr>
+                <tr><td>Remote GPU</td><td>Remote bge-m3</td><td>Remote qwen2.5:32b</td><td>&mdash;</td><td>Remote qwen2.5:14b</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 4A. ALL LOCAL -->
+    <div class="diagram-section" id="deploy-local">
+        <h2>4A. All Local</h2>
+        <p class="desc">Everything runs on the MacBook. Best privacy, no internet needed. Requires 8-36GB RAM.</p>
+        <pre class="mermaid">
+flowchart LR
+    subgraph Mac ["MacBook - Everything Local"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG<br/>port 9621"]
+        OL["Ollama<br/>port 11434"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+
+        UI <--> LR
+        LR <--> OL
+        LR --> ST
+    end
+        </pre>
+    </div>
+
+    <!-- 4B. REMOTE OLLAMA -->
+    <div class="diagram-section" id="deploy-remote-ollama">
+        <h2>4B. Remote Ollama</h2>
+        <p class="desc">LightRAG and storage stay local. Models run on a GPU server in LAN/VPN.</p>
+        <pre class="mermaid">
+flowchart LR
+    subgraph Mac ["MacBook"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG<br/>port 9621"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        UI <--> LR
+        LR --> ST
+    end
+
+    subgraph GPU ["GPU Server - LAN"]
+        OL["Ollama port 11434<br/>qwen2.5:32b + bge-m3"]
+    end
+
+    LR <-->|"HTTP API"| OL
+        </pre>
+    </div>
+
+    <!-- 4C. CLOUD API -->
+    <div class="diagram-section" id="deploy-cloud">
+        <h2>4C. Cloud API</h2>
+        <p class="desc">LightRAG local, models via cloud APIs. No local GPU needed.</p>
+        <pre class="mermaid">
+flowchart LR
+    subgraph Mac ["MacBook"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+        LR["LightRAG<br/>port 9621"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        UI <--> LR
+        LR --> ST
+    end
+
+    subgraph Cloud ["Cloud Providers"]
+        OAI["OpenAI<br/>gpt-4o + embeddings"]
+        DS["DeepSeek<br/>deepseek-chat"]
+    end
+
+    LR <-->|"HTTPS"| OAI
+    LR <-->|"HTTPS"| DS
+        </pre>
+    </div>
+
+    <!-- 4D. HYBRID -->
+    <div class="diagram-section" id="deploy-hybrid">
+        <h2>4D. Hybrid</h2>
+        <p class="desc">Mix: local Ollama for generation, GPU server for embedding, cloud for extraction. Maximum flexibility.</p>
+        <pre class="mermaid">
+flowchart LR
+    subgraph Mac ["MacBook"]
+        UI["BrainAI"]
+        LR["LightRAG port 9621"]
+        OL["Ollama Local<br/>qwen2.5:14b<br/>GENERATION"]:::role4cls
+        ST[("Storage")]
+        UI <--> LR
+        LR <--> OL
+        LR --> ST
+    end
+
+    subgraph GPU ["GPU Server"]
+        ROL["Ollama Remote<br/>bge-m3<br/>EMBEDDING"]:::role1cls
+    end
+
+    subgraph Cloud ["Cloud"]
+        OAI["OpenAI gpt-4o<br/>EXTRACTION"]:::role2cls
+        JN["Jina API<br/>RERANKER"]:::role3cls
+    end
+
+    LR <-->|"LAN"| ROL
+    LR <-->|"HTTPS"| OAI
+    LR <-->|"HTTPS"| JN
+
+    classDef role1cls fill:#3498DB,stroke:#2471A3,color:#fff
+    classDef role2cls fill:#E74C3C,stroke:#C0392B,color:#fff
+    classDef role3cls fill:#F39C12,stroke:#D68910,color:#fff
+    classDef role4cls fill:#27AE60,stroke:#1E8449,color:#fff
+        </pre>
+    </div>
+
+    <!-- 4E. THIN CLIENT -->
+    <div class="diagram-section" id="deploy-thin">
+        <h2>4E. Thin Client</h2>
+        <p class="desc">Everything on the server. MacBook is just UI. Connected via REST API / MCP with Bearer auth + TLS.</p>
+        <pre class="mermaid">
+flowchart LR
+    subgraph Mac ["MacBook - Thin Client"]
+        UI["BrainAI<br/>UI + Tray + Settings"]
+    end
+
+    subgraph Server ["Remote Server"]
+        LR["LightRAG port 9621"]
+        OL["Ollama port 11434"]
+        ST[("Storage<br/>Graph + Vectors + Docs")]
+        LR <--> OL
+        LR --> ST
+    end
+
+    UI <-->|"REST / MCP<br/>Bearer Auth + TLS"| LR
+        </pre>
+    </div>
+
+    <!-- 5. MULTI-WORKSPACE -->
+    <div class="diagram-section" id="workspaces">
+        <h2>5. Multi-Workspace Architecture</h2>
+        <p class="desc">Each Workspace is an isolated LightRAG instance with its own storage, port, and provider configuration. Cross-query merges results from multiple Workspaces.</p>
+        <pre class="mermaid">
+flowchart TB
+    subgraph APP ["BrainAI Application"]
+        UI["Main UI / Tray / Settings"]
+        WM["WorkspaceManager<br/>Lifecycle, Cross-query"]
+        UI <--> WM
+    end
+
+    subgraph W1 ["Workspace: Work"]
+        LR1["LightRAG :9621"]
+        S1[("Storage")]
+        LR1 --> S1
+    end
+
+    subgraph W2 ["Workspace: Personal"]
+        LR2["LightRAG :9622"]
+        S2[("Storage")]
+        LR2 --> S2
+    end
+
+    subgraph W3 ["Workspace: ESP32"]
+        LR3["LightRAG :9623"]
+        S3[("Storage")]
+        LR3 --> S3
+    end
+
+    subgraph W4 ["Workspace: Automotive"]
+        LR4["LightRAG :9624"]
+        S4[("Storage")]
+        LR4 --> S4
+    end
+
+    WM --> LR1
+    WM --> LR2
+    WM --> LR3
+    WM --> LR4
+
+    subgraph PROV1 ["Work Providers"]
+        OAI1["OpenAI API<br/>gpt-4o + embeddings"]
+    end
+
+    subgraph PROV2 ["Personal + Hobby Providers"]
+        OL["Ollama Local<br/>qwen2.5:14b + bge-m3"]
+    end
+
+    subgraph PROV4 ["Automotive Providers"]
+        DSK["DeepSeek API<br/>deepseek-chat"]
+    end
+
+    LR1 <-->|"HTTPS"| OAI1
+    LR2 <--> OL
+    LR3 <--> OL
+    LR4 <-->|"HTTPS"| DSK
+        </pre>
+    </div>
+
+    <!-- 6. CROSS-QUERY -->
+    <div class="diagram-section" id="cross-query">
+        <h2>6. Cross-Workspace Query</h2>
+        <p class="desc">Search across all or selected Workspaces. Results are merged and ranked by relevance score, each tagged with its source Workspace.</p>
+        <pre class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant WM as WorkspaceManager
+    participant W1 as Work :9621
+    participant W2 as Personal :9622
+    participant W3 as ESP32 :9623
+    participant W4 as Automotive :9624
+
+    U->>WM: query "I2C protocol" workspace=all
+    par Parallel queries
+        WM->>W1: POST /api/query
+        WM->>W2: POST /api/query
+        WM->>W3: POST /api/query
+        WM->>W4: POST /api/query
+    end
+    W1-->>WM: 2 results (score 0.3, 0.2)
+    W2-->>WM: 0 results
+    W3-->>WM: 5 results (score 0.9, 0.8, 0.7, 0.5, 0.4)
+    W4-->>WM: 1 result (score 0.6)
+    WM->>WM: Merge and rank by score
+    WM-->>U: 8 results with Workspace tags
+        </pre>
+    </div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                darkMode: true,
+                background: '#0d1117',
+                primaryColor: '#1f6feb',
+                primaryTextColor: '#c9d1d9',
+                primaryBorderColor: '#30363d',
+                lineColor: '#58a6ff',
+                secondaryColor: '#161b22',
+                tertiaryColor: '#1c2128'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>
