@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "BrainAI",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -41,7 +42,10 @@ let package = Package(
                 "KeychainAccess",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
-            path: "Sources/BrainAICore"
+            path: "Sources/BrainAICore",
+            resources: [
+                .process("Resources"),
+            ]
         ),
 
         // MARK: - Tray App (Menu Bar Agent)

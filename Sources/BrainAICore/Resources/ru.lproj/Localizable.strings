@@ -1,0 +1,110 @@
+/* BrainAI — Русская локализация */
+
+/* Common */
+"common.app_name" = "BrainAI";
+"common.ok" = "ОК";
+"common.cancel" = "Отмена";
+"common.save" = "Сохранить";
+"common.delete" = "Удалить";
+"common.edit" = "Редактировать";
+"common.close" = "Закрыть";
+"common.search" = "Поиск";
+"common.loading" = "Загрузка...";
+"common.error" = "Ошибка";
+"common.retry" = "Повторить";
+"common.settings" = "Настройки";
+"common.done" = "Готово";
+"common.back" = "Назад";
+"common.next" = "Далее";
+"common.copy" = "Копировать";
+"common.share" = "Поделиться";
+
+/* Navigation */
+"nav.dashboard" = "Главная";
+"nav.chat" = "Чат";
+"nav.documents" = "Документы";
+"nav.search" = "Поиск";
+"nav.notes" = "Заметки";
+"nav.graph" = "Граф знаний";
+
+/* Chat */
+"chat.placeholder" = "Задайте вопрос...";
+"chat.thinking" = "Думаю...";
+"chat.send" = "Отправить";
+"chat.clear_history" = "Очистить историю";
+"chat.no_messages" = "Сообщений пока нет. Начните диалог!";
+"chat.mode" = "Режим поиска";
+
+/* Documents */
+"documents.title" = "Документы";
+"documents.add" = "Добавить документ";
+"documents.empty" = "Документов пока нет";
+"documents.processing" = "Обработка";
+"documents.processed" = "Обработан";
+"documents.failed" = "Ошибка";
+"documents.pending" = "В очереди";
+"documents.delete_confirm" = "Вы уверены, что хотите удалить этот документ?";
+
+/* Knowledge Graph */
+"graph.title" = "Граф знаний";
+"graph.entities" = "Сущности";
+"graph.relations" = "Связи";
+"graph.filter" = "Фильтр";
+"graph.find_path" = "Найти путь";
+"graph.zoom_to_fit" = "Вписать в экран";
+"graph.relayout" = "Перестроить";
+"graph.reload" = "Обновить";
+"graph.no_data" = "Нет данных для отображения";
+"graph.selected_node" = "Выбранный узел";
+"graph.connections" = "Связи";
+
+/* Settings */
+"settings.title" = "Настройки";
+"settings.general" = "Основные";
+"settings.providers" = "Провайдеры";
+"settings.server" = "Сервер";
+"settings.models" = "Модели";
+"settings.workspaces" = "Рабочие области";
+"settings.advanced" = "Расширенные";
+"settings.language" = "Язык";
+"settings.theme" = "Тема оформления";
+"settings.check_updates" = "Проверить обновления";
+"settings.auto_updates" = "Проверять обновления автоматически";
+
+/* Server */
+"server.local" = "Локальный";
+"server.remote" = "Удалённый";
+"server.connected" = "Подключён";
+"server.disconnected" = "Отключён";
+"server.connecting" = "Подключение...";
+"server.test_connection" = "Проверить соединение";
+"server.latency" = "Задержка";
+"server.status" = "Статус";
+"server.start" = "Запустить";
+"server.stop" = "Остановить";
+"server.restart" = "Перезапустить";
+
+/* Tray */
+"tray.open_app" = "Открыть BrainAI";
+"tray.quit" = "Завершить BrainAI";
+"tray.running" = "Работает";
+"tray.stopped" = "Остановлен";
+"tray.model" = "Модель";
+
+/* Installer */
+"installer.welcome" = "Добро пожаловать в BrainAI";
+"installer.welcome_subtitle" = "Ваша персональная база знаний с ИИ";
+"installer.components" = "Компоненты";
+"installer.provider" = "Провайдер";
+"installer.models" = "Модели";
+"installer.download" = "Загрузка";
+"installer.complete" = "Установка завершена";
+"installer.complete_message" = "BrainAI готов к работе!";
+"installer.install" = "Установить";
+
+/* Errors */
+"errors.network" = "Ошибка сетевого подключения";
+"errors.unauthorized" = "Ошибка аутентификации";
+"errors.server_unavailable" = "Сервер недоступен";
+"errors.decoding" = "Ошибка формата данных";
+"errors.unknown" = "Произошла непредвиденная ошибка";

@@ -1,0 +1,110 @@
+/* BrainAI — English localization */
+
+/* Common */
+"common.app_name" = "BrainAI";
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.save" = "Save";
+"common.delete" = "Delete";
+"common.edit" = "Edit";
+"common.close" = "Close";
+"common.search" = "Search";
+"common.loading" = "Loading...";
+"common.error" = "Error";
+"common.retry" = "Retry";
+"common.settings" = "Settings";
+"common.done" = "Done";
+"common.back" = "Back";
+"common.next" = "Next";
+"common.copy" = "Copy";
+"common.share" = "Share";
+
+/* Navigation */
+"nav.dashboard" = "Dashboard";
+"nav.chat" = "Chat";
+"nav.documents" = "Documents";
+"nav.search" = "Search";
+"nav.notes" = "Notes";
+"nav.graph" = "Knowledge Graph";
+
+/* Chat */
+"chat.placeholder" = "Ask a question...";
+"chat.thinking" = "Thinking...";
+"chat.send" = "Send";
+"chat.clear_history" = "Clear History";
+"chat.no_messages" = "No messages yet. Start a conversation!";
+"chat.mode" = "Search Mode";
+
+/* Documents */
+"documents.title" = "Documents";
+"documents.add" = "Add Document";
+"documents.empty" = "No documents yet";
+"documents.processing" = "Processing";
+"documents.processed" = "Processed";
+"documents.failed" = "Failed";
+"documents.pending" = "Pending";
+"documents.delete_confirm" = "Are you sure you want to delete this document?";
+
+/* Knowledge Graph */
+"graph.title" = "Knowledge Graph";
+"graph.entities" = "Entities";
+"graph.relations" = "Relations";
+"graph.filter" = "Filter";
+"graph.find_path" = "Find Path";
+"graph.zoom_to_fit" = "Zoom to Fit";
+"graph.relayout" = "Re-layout";
+"graph.reload" = "Reload";
+"graph.no_data" = "No graph data available";
+"graph.selected_node" = "Selected Node";
+"graph.connections" = "Connections";
+
+/* Settings */
+"settings.title" = "Settings";
+"settings.general" = "General";
+"settings.providers" = "Providers";
+"settings.server" = "Server";
+"settings.models" = "Models";
+"settings.workspaces" = "Workspaces";
+"settings.advanced" = "Advanced";
+"settings.language" = "Language";
+"settings.theme" = "Theme";
+"settings.check_updates" = "Check for Updates";
+"settings.auto_updates" = "Automatically Check for Updates";
+
+/* Server */
+"server.local" = "Local";
+"server.remote" = "Remote";
+"server.connected" = "Connected";
+"server.disconnected" = "Disconnected";
+"server.connecting" = "Connecting...";
+"server.test_connection" = "Test Connection";
+"server.latency" = "Latency";
+"server.status" = "Status";
+"server.start" = "Start";
+"server.stop" = "Stop";
+"server.restart" = "Restart";
+
+/* Tray */
+"tray.open_app" = "Open BrainAI";
+"tray.quit" = "Quit BrainAI";
+"tray.running" = "Running";
+"tray.stopped" = "Stopped";
+"tray.model" = "Model";
+
+/* Installer */
+"installer.welcome" = "Welcome to BrainAI";
+"installer.welcome_subtitle" = "Your personal knowledge base with AI";
+"installer.components" = "Components";
+"installer.provider" = "Provider";
+"installer.models" = "Models";
+"installer.download" = "Download";
+"installer.complete" = "Setup Complete";
+"installer.complete_message" = "BrainAI is ready to use!";
+"installer.install" = "Install";
+
+/* Errors */
+"errors.network" = "Network connection error";
+"errors.unauthorized" = "Authentication failed";
+"errors.server_unavailable" = "Server is unavailable";
+"errors.decoding" = "Data format error";
+"errors.unknown" = "An unexpected error occurred";

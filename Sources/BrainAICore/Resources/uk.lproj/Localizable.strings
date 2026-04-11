@@ -1,0 +1,110 @@
+/* BrainAI — Українська локалізація */
+
+/* Common */
+"common.app_name" = "BrainAI";
+"common.ok" = "ОК";
+"common.cancel" = "Скасувати";
+"common.save" = "Зберегти";
+"common.delete" = "Видалити";
+"common.edit" = "Редагувати";
+"common.close" = "Закрити";
+"common.search" = "Пошук";
+"common.loading" = "Завантаження...";
+"common.error" = "Помилка";
+"common.retry" = "Повторити";
+"common.settings" = "Налаштування";
+"common.done" = "Готово";
+"common.back" = "Назад";
+"common.next" = "Далі";
+"common.copy" = "Копіювати";
+"common.share" = "Поділитися";
+
+/* Navigation */
+"nav.dashboard" = "Головна";
+"nav.chat" = "Чат";
+"nav.documents" = "Документи";
+"nav.search" = "Пошук";
+"nav.notes" = "Нотатки";
+"nav.graph" = "Граф знань";
+
+/* Chat */
+"chat.placeholder" = "Поставте запитання...";
+"chat.thinking" = "Думаю...";
+"chat.send" = "Надіслати";
+"chat.clear_history" = "Очистити історію";
+"chat.no_messages" = "Повідомлень поки немає. Розпочніть діалог!";
+"chat.mode" = "Режим пошуку";
+
+/* Documents */
+"documents.title" = "Документи";
+"documents.add" = "Додати документ";
+"documents.empty" = "Документів поки немає";
+"documents.processing" = "Обробка";
+"documents.processed" = "Оброблено";
+"documents.failed" = "Помилка";
+"documents.pending" = "У черзі";
+"documents.delete_confirm" = "Ви впевнені, що хочете видалити цей документ?";
+
+/* Knowledge Graph */
+"graph.title" = "Граф знань";
+"graph.entities" = "Сутності";
+"graph.relations" = "Зв'язки";
+"graph.filter" = "Фільтр";
+"graph.find_path" = "Знайти шлях";
+"graph.zoom_to_fit" = "Вмістити в екран";
+"graph.relayout" = "Перебудувати";
+"graph.reload" = "Оновити";
+"graph.no_data" = "Немає даних для відображення";
+"graph.selected_node" = "Обраний вузол";
+"graph.connections" = "Зв'язки";
+
+/* Settings */
+"settings.title" = "Налаштування";
+"settings.general" = "Основні";
+"settings.providers" = "Провайдери";
+"settings.server" = "Сервер";
+"settings.models" = "Моделі";
+"settings.workspaces" = "Робочі простори";
+"settings.advanced" = "Розширені";
+"settings.language" = "Мова";
+"settings.theme" = "Тема оформлення";
+"settings.check_updates" = "Перевірити оновлення";
+"settings.auto_updates" = "Перевіряти оновлення автоматично";
+
+/* Server */
+"server.local" = "Локальний";
+"server.remote" = "Віддалений";
+"server.connected" = "Підключено";
+"server.disconnected" = "Відключено";
+"server.connecting" = "Підключення...";
+"server.test_connection" = "Перевірити з'єднання";
+"server.latency" = "Затримка";
+"server.status" = "Статус";
+"server.start" = "Запустити";
+"server.stop" = "Зупинити";
+"server.restart" = "Перезапустити";
+
+/* Tray */
+"tray.open_app" = "Відкрити BrainAI";
+"tray.quit" = "Завершити BrainAI";
+"tray.running" = "Працює";
+"tray.stopped" = "Зупинено";
+"tray.model" = "Модель";
+
+/* Installer */
+"installer.welcome" = "Ласкаво просимо до BrainAI";
+"installer.welcome_subtitle" = "Ваша персональна база знань з ШІ";
+"installer.components" = "Компоненти";
+"installer.provider" = "Провайдер";
+"installer.models" = "Моделі";
+"installer.download" = "Завантаження";
+"installer.complete" = "Встановлення завершено";
+"installer.complete_message" = "BrainAI готовий до роботи!";
+"installer.install" = "Встановити";
+
+/* Errors */
+"errors.network" = "Помилка мережевого з'єднання";
+"errors.unauthorized" = "Помилка автентифікації";
+"errors.server_unavailable" = "Сервер недоступний";
+"errors.decoding" = "Помилка формату даних";
+"errors.unknown" = "Виникла непередбачена помилка";
