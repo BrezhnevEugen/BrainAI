@@ -20,6 +20,10 @@ let package = Package(
             name: "BrainAISettings",
             targets: ["BrainAISettings"]
         ),
+        .executable(
+            name: "BrainAIApp",
+            targets: ["BrainAIApp"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess.git", from: "4.2.2"),
@@ -46,6 +50,13 @@ let package = Package(
             name: "BrainAISettings",
             dependencies: ["BrainAICore"],
             path: "Sources/BrainAISettings"
+        ),
+
+        // MARK: - Main UI App (SwiftUI)
+        .executableTarget(
+            name: "BrainAIApp",
+            dependencies: ["BrainAICore"],
+            path: "Sources/BrainAIApp"
         ),
 
         // MARK: - Tests
