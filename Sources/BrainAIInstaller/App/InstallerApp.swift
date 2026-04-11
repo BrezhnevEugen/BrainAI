@@ -78,12 +78,7 @@ final class InstallerViewModel: @unchecked Sendable {
             let ollamaFound = await checkCommandExists("ollama")
             let pythonFound = await checkCommandExists("python3")
             let brewFound = await checkCommandExists("brew")
-
-            lock.lock()
-            ollamaInstalled = ollamaFound
-            pythonInstalled = pythonFound
-            homebrewInstalled = brewFound
-            lock.unlock()
+            applyDetectedComponents(ollama: ollamaFound, python: pythonFound, brew: brewFound)
         }
     }
 
@@ -169,39 +164,20 @@ final class InstallerViewModel: @unchecked Sendable {
     // MARK: - Installation
 
     func startInstallation() async {
-        lock.lock()
-        isDownloading = true
-        downloadTasks = buildDownloadTasks()
-        currentTaskIndex = 0
-        lock.unlock()
+        beginInstallation()
 
         for i in 0..<downloadTasks.count {
-            lock.lock()
-            currentTaskIndex = i
-            downloadTasks[i].status = .inProgress
-            lock.unlock()
+            markTaskInProgress(i)
 
             do {
                 try await executeTask(downloadTasks[i])
-                lock.lock()
-                downloadTasks[i].status = .completed
-                lock.unlock()
+                markTaskCompleted(i)
             } catch {
-                lock.lock()
-                downloadTasks[i].status = .failed(error.localizedDescription)
-                lock.unlock()
+                markTaskFailed(i, message: error.localizedDescription)
             }
         }
 
-        lock.lock()
-        isDownloading = false
-        lock.unlock()
-
-        // Move to complete step
-        lock.lock()
-        currentStep = .complete
-        lock.unlock()
-
+        finishInstallation()
         await runHealthChecks()
     }
 
@@ -288,14 +264,60 @@ final class InstallerViewModel: @unchecked Sendable {
         do {
             let client = LocalLightRAGClient()
             let health = try await client.healthCheck()
-            lock.lock()
-            allComponentsHealthy = health.status == "ok" || health.status == "healthy"
-            lock.unlock()
+            setHealthy(health.status == "ok" || health.status == "healthy")
         } catch {
-            lock.lock()
-            allComponentsHealthy = false
-            lock.unlock()
+            setHealthy(false)
         }
+    }
+
+    // MARK: - Sync Helpers (avoid NSLock in async context)
+
+    private func applyDetectedComponents(ollama: Bool, python: Bool, brew: Bool) {
+        lock.lock()
+        ollamaInstalled = ollama
+        pythonInstalled = python
+        homebrewInstalled = brew
+        lock.unlock()
+    }
+
+    private func beginInstallation() {
+        lock.lock()
+        isDownloading = true
+        downloadTasks = buildDownloadTasks()
+        currentTaskIndex = 0
+        lock.unlock()
+    }
+
+    private func markTaskInProgress(_ index: Int) {
+        lock.lock()
+        currentTaskIndex = index
+        downloadTasks[index].status = .inProgress
+        lock.unlock()
+    }
+
+    private func markTaskCompleted(_ index: Int) {
+        lock.lock()
+        downloadTasks[index].status = .completed
+        lock.unlock()
+    }
+
+    private func markTaskFailed(_ index: Int, message: String) {
+        lock.lock()
+        downloadTasks[index].status = .failed(message)
+        lock.unlock()
+    }
+
+    private func finishInstallation() {
+        lock.lock()
+        isDownloading = false
+        currentStep = .complete
+        lock.unlock()
+    }
+
+    private func setHealthy(_ value: Bool) {
+        lock.lock()
+        allComponentsHealthy = value
+        lock.unlock()
     }
 
     // MARK: - Helpers

@@ -74,9 +74,8 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked 
         }
 
         // Check pinned certificates
-        let certificateCount = SecTrustGetCertificateCount(serverTrust)
-        for index in 0..<certificateCount {
-            if let certificate = SecTrustGetCertificateAtIndex(serverTrust, index) {
+        if let certificateChain = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate] {
+            for certificate in certificateChain {
                 let certData = SecCertificateCopyData(certificate) as Data
                 let hash = certData.sha256HexString
                 if pinnedCertificateHashes.contains(hash) {

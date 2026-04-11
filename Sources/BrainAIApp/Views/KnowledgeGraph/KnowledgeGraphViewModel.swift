@@ -42,34 +42,22 @@ final class KnowledgeGraphViewModel: @unchecked Sendable {
     // MARK: - Data Loading
 
     func loadGraphLabels() async {
-        lock.lock()
-        isLoading = true
-        errorMessage = nil
-        lock.unlock()
+        setLoading(true)
+        clearError()
 
         do {
             let labels = try await lightRAGClient.getGraphLabels()
-            lock.lock()
-            entityLabels = labels.entityLabels
-            relationLabels = labels.relationLabels
-            selectedEntityTypes = Set(labels.entityLabels)
-            lock.unlock()
+            applyLabels(entity: labels.entityLabels, relation: labels.relationLabels)
         } catch {
-            lock.lock()
-            errorMessage = "Failed to load graph labels: \(error.localizedDescription)"
-            lock.unlock()
+            applyError("Failed to load graph labels: \(error.localizedDescription)")
         }
 
-        lock.lock()
-        isLoading = false
-        lock.unlock()
+        setLoading(false)
     }
 
     func loadGraphData(forLabel label: String = "", searchText: String = "", maxItems: Int = 200) async {
-        lock.lock()
-        isLoading = true
-        errorMessage = nil
-        lock.unlock()
+        setLoading(true)
+        clearError()
 
         do {
             // If no specific label, load for each entity type
@@ -108,22 +96,55 @@ final class KnowledgeGraphViewModel: @unchecked Sendable {
                 }
             }
 
-            lock.lock()
-            graphNodes = allNodes
-            graphEdges = allEdges
-            nodeCount = allNodes.count
-            edgeCount = allEdges.count
-            lock.unlock()
+            applyGraphData(nodes: allNodes, edges: allEdges)
         } catch {
-            lock.lock()
-            errorMessage = "Failed to load graph: \(error.localizedDescription)"
-            // Provide demo data if service is unavailable
-            loadDemoData()
-            lock.unlock()
+            applyError("Failed to load graph: \(error.localizedDescription)")
         }
 
+        setLoading(false)
+    }
+
+    /// Sync helper — applies loaded graph data under lock (avoids NSLock in async context)
+    private func applyGraphData(
+        nodes: [(id: String, label: String, type: String, description: String?)],
+        edges: [(source: String, target: String, description: String?, keywords: String?)]
+    ) {
         lock.lock()
-        isLoading = false
+        graphNodes = nodes
+        graphEdges = edges
+        nodeCount = nodes.count
+        edgeCount = edges.count
+        lock.unlock()
+    }
+
+    /// Sync helper — applies error and demo data under lock
+    private func applyError(_ message: String) {
+        lock.lock()
+        errorMessage = message
+        loadDemoData()
+        lock.unlock()
+    }
+
+    /// Sync helper — sets loading state under lock
+    private func setLoading(_ value: Bool) {
+        lock.lock()
+        isLoading = value
+        lock.unlock()
+    }
+
+    /// Sync helper — clears error message under lock
+    private func clearError() {
+        lock.lock()
+        errorMessage = nil
+        lock.unlock()
+    }
+
+    /// Sync helper — applies loaded labels under lock
+    private func applyLabels(entity: [String], relation: [String]) {
+        lock.lock()
+        entityLabels = entity
+        relationLabels = relation
+        selectedEntityTypes = Set(entity)
         lock.unlock()
     }
 

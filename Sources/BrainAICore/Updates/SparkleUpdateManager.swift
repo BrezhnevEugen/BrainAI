@@ -89,14 +89,8 @@ public final class SparkleUpdateManager: NSObject, @unchecked Sendable {
     /// Default appcast URL for BrainAI releases
     public static let defaultAppcastURL = "https://github.com/BrainAI-App/BrainAI/releases/latest/download/appcast.xml"
 
-    /// Set a custom appcast URL
-    public func setFeedURL(_ url: String) {
-        if let feedURL = URL(string: url) {
-            updaterController.updater.setFeedURL(feedURL)
-        }
-    }
-
     /// Configure default update settings
+    /// Note: Set the appcast URL via SUFeedURL key in Info.plist
     public func configureDefaults() {
         // Check for updates every 24 hours
         updaterController.updater.updateCheckInterval = 86400

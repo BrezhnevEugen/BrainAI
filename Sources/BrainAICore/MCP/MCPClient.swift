@@ -325,11 +325,7 @@ public final class WebSocketTransport: MCPTransport, @unchecked Sendable {
     }
 
     public func send(_ data: Data) async throws {
-        lock.lock()
-        let task = webSocketTask
-        lock.unlock()
-
-        guard let task else {
+        guard let task = getTask() else {
             throw MCPClientError.transportError("WebSocket not connected")
         }
 
@@ -338,11 +334,7 @@ public final class WebSocketTransport: MCPTransport, @unchecked Sendable {
     }
 
     public func receive() async throws -> Data {
-        lock.lock()
-        let task = webSocketTask
-        lock.unlock()
-
-        guard let task else {
+        guard let task = getTask() else {
             throw MCPClientError.transportError("WebSocket not connected")
         }
 
@@ -358,6 +350,18 @@ public final class WebSocketTransport: MCPTransport, @unchecked Sendable {
     }
 
     public func close() async {
+        cancelAndClear()
+    }
+
+    // MARK: - Sync Helpers (avoid NSLock in async context)
+
+    private func getTask() -> URLSessionWebSocketTask? {
+        lock.lock()
+        defer { lock.unlock() }
+        return webSocketTask
+    }
+
+    private func cancelAndClear() {
         lock.lock()
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
@@ -396,9 +400,7 @@ public final class MCPClientManager: @unchecked Sendable {
         let serverInfo = try await client.initialize()
         let tools = try await client.listTools()
 
-        lock.lock()
-        clients[id] = client
-        connections.append(MCPConnectionInfo(
+        addConnection(id: id, client: client, info: MCPConnectionInfo(
             id: id,
             name: name,
             serverName: serverInfo.serverInfo?.name ?? name,
@@ -406,7 +408,6 @@ public final class MCPClientManager: @unchecked Sendable {
             toolCount: tools.count,
             status: .connected
         ))
-        lock.unlock()
     }
 
     /// Connect to an MCP server via WebSocket
@@ -423,9 +424,7 @@ public final class MCPClientManager: @unchecked Sendable {
         let serverInfo = try await client.initialize()
         let tools = try await client.listTools()
 
-        lock.lock()
-        clients[id] = client
-        connections.append(MCPConnectionInfo(
+        addConnection(id: id, client: client, info: MCPConnectionInfo(
             id: id,
             name: name,
             serverName: serverInfo.serverInfo?.name ?? name,
@@ -433,18 +432,11 @@ public final class MCPClientManager: @unchecked Sendable {
             toolCount: tools.count,
             status: .connected
         ))
-        lock.unlock()
     }
 
     /// Disconnect from an MCP server
     public func disconnect(id: String) async {
-        lock.lock()
-        let client = clients.removeValue(forKey: id)
-        if let index = connections.firstIndex(where: { $0.id == id }) {
-            connections[index].status = .disconnected
-        }
-        lock.unlock()
-
+        let client = removeConnection(id: id)
         await client?.close()
     }
 
@@ -454,11 +446,7 @@ public final class MCPClientManager: @unchecked Sendable {
         toolName: String,
         arguments: [String: AnyCodable] = [:]
     ) async throws -> MCPToolCallResult {
-        lock.lock()
-        let client = clients[connectionId]
-        lock.unlock()
-
-        guard let client else {
+        guard let client = getClient(connectionId) else {
             throw MCPClientError.transportError("No connection with id '\(connectionId)'")
         }
 
@@ -467,9 +455,7 @@ public final class MCPClientManager: @unchecked Sendable {
 
     /// Get all tools across all connected servers
     public func allTools() async -> [(connectionId: String, tool: MCPToolDefinition)] {
-        lock.lock()
-        let clientsCopy = clients
-        lock.unlock()
+        let clientsCopy = snapshotClients()
 
         var result: [(connectionId: String, tool: MCPToolDefinition)] = []
         for (id, client) in clientsCopy {
@@ -483,17 +469,53 @@ public final class MCPClientManager: @unchecked Sendable {
 
     /// Disconnect all servers
     public func disconnectAll() async {
+        let clientsCopy = removeAllClients()
+
+        for (_, client) in clientsCopy {
+            await client.close()
+        }
+    }
+
+    // MARK: - Sync Helpers (avoid NSLock in async context)
+
+    private func addConnection(id: String, client: MCPClient, info: MCPConnectionInfo) {
         lock.lock()
-        let clientsCopy = clients
+        clients[id] = client
+        connections.append(info)
+        lock.unlock()
+    }
+
+    private func removeConnection(id: String) -> MCPClient? {
+        lock.lock()
+        let client = clients.removeValue(forKey: id)
+        if let index = connections.firstIndex(where: { $0.id == id }) {
+            connections[index].status = .disconnected
+        }
+        lock.unlock()
+        return client
+    }
+
+    private func getClient(_ id: String) -> MCPClient? {
+        lock.lock()
+        defer { lock.unlock() }
+        return clients[id]
+    }
+
+    private func snapshotClients() -> [String: MCPClient] {
+        lock.lock()
+        defer { lock.unlock() }
+        return clients
+    }
+
+    private func removeAllClients() -> [String: MCPClient] {
+        lock.lock()
+        let copy = clients
         clients.removeAll()
         for index in connections.indices {
             connections[index].status = .disconnected
         }
         lock.unlock()
-
-        for (_, client) in clientsCopy {
-            await client.close()
-        }
+        return copy
     }
 }
 

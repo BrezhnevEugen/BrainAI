@@ -259,28 +259,29 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Actions
 
     @objc private func openMainUI() {
-        // TODO: Launch BrainAIApp or open WebUI in browser
+        let parent = Bundle.main.bundleURL.deletingLastPathComponent()
+        let mainApp = parent.appendingPathComponent("BrainAI.app", isDirectory: true)
+        if FileManager.default.fileExists(atPath: mainApp.path) {
+            NSWorkspace.shared.open(mainApp)
+            return
+        }
         if let url = URL(string: "http://localhost:9621") {
             NSWorkspace.shared.open(url)
         }
     }
 
     @objc private func openSettings() {
-        // Launch BrainAISettings as a separate process
-        let settingsPath = Bundle.main.bundleURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("BrainAISettings")
-
-        if FileManager.default.fileExists(atPath: settingsPath.path) {
+        let parent = Bundle.main.bundleURL.deletingLastPathComponent()
+        let settingsApp = parent.appendingPathComponent("BrainAI Settings.app", isDirectory: true)
+        if FileManager.default.fileExists(atPath: settingsApp.path) {
+            NSWorkspace.shared.open(settingsApp)
+            return
+        }
+        let settingsBinary = parent.appendingPathComponent("BrainAISettings")
+        if FileManager.default.fileExists(atPath: settingsBinary.path) {
             let task = Process()
-            task.executableURL = settingsPath
+            task.executableURL = settingsBinary
             try? task.run()
-        } else {
-            // Fallback: try to find it as a .app bundle
-            let appPath = Bundle.main.bundleURL
-                .deletingLastPathComponent()
-                .appendingPathComponent("BrainAI Settings.app")
-            NSWorkspace.shared.open(appPath)
         }
     }
 

@@ -84,10 +84,7 @@ public final class RemoteConnectionManager: @unchecked Sendable {
 
     /// Connect to a remote LightRAG server
     public func connect(config: RemoteConnectionConfig) async {
-        lock.lock()
-        self.config = config
-        connectionState = .connecting
-        lock.unlock()
+        applyConfig(config)
 
         let newClient: RemoteLightRAGClient
         if !config.tlsPinnedHashes.isEmpty {
@@ -103,9 +100,7 @@ public final class RemoteConnectionManager: @unchecked Sendable {
             )
         }
 
-        lock.lock()
-        client = newClient
-        lock.unlock()
+        setClient(newClient)
 
         // Perform initial health check
         await performHealthCheck()
@@ -118,13 +113,7 @@ public final class RemoteConnectionManager: @unchecked Sendable {
     public func disconnect() {
         healthCheckTask?.cancel()
         healthCheckTask = nil
-
-        lock.lock()
-        client = nil
-        config = nil
-        connectionState = .disconnected
-        serverInfo = nil
-        lock.unlock()
+        clearConnection()
     }
 
     /// Get the active client (if connected)
@@ -150,24 +139,61 @@ public final class RemoteConnectionManager: @unchecked Sendable {
     }
 
     public func performHealthCheck() async {
-        guard let client = client else { return }
+        guard let client = getClientSync() else { return }
 
         let startTime = Date()
         do {
             let health = try await client.healthCheck()
             let latency = Date().timeIntervalSince(startTime)
-
-            lock.lock()
-            lastHealthCheck = Date()
-            lastLatency = latency
-            serverInfo = health
-            connectionState = .connected(latency: latency)
-            lock.unlock()
+            applyHealthResult(latency: latency, health: health)
         } catch {
-            lock.lock()
-            connectionState = .error(error.localizedDescription)
-            lock.unlock()
+            applyHealthError(error.localizedDescription)
         }
+    }
+
+    // MARK: - Sync Helpers (avoid NSLock in async context)
+
+    private func getClientSync() -> RemoteLightRAGClient? {
+        lock.lock()
+        defer { lock.unlock() }
+        return client
+    }
+
+    private func applyConfig(_ config: RemoteConnectionConfig) {
+        lock.lock()
+        self.config = config
+        connectionState = .connecting
+        lock.unlock()
+    }
+
+    private func setClient(_ newClient: RemoteLightRAGClient) {
+        lock.lock()
+        client = newClient
+        lock.unlock()
+    }
+
+    private func clearConnection() {
+        lock.lock()
+        client = nil
+        config = nil
+        connectionState = .disconnected
+        serverInfo = nil
+        lock.unlock()
+    }
+
+    private func applyHealthResult(latency: TimeInterval, health: HealthResponse) {
+        lock.lock()
+        lastHealthCheck = Date()
+        lastLatency = latency
+        serverInfo = health
+        connectionState = .connected(latency: latency)
+        lock.unlock()
+    }
+
+    private func applyHealthError(_ message: String) {
+        lock.lock()
+        connectionState = .error(message)
+        lock.unlock()
     }
 
     // MARK: - Retry Logic

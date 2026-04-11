@@ -9,5 +9,9 @@
 # macOS
 .DS_Store
 
+# Local release output (see scripts/build-and-sign.sh)
+dist/
+*.dmg
+
 # Local / optional spec copy (canonical spec may live elsewhere)
 TECHNICAL_SPEC.md

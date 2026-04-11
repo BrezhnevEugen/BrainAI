@@ -202,9 +202,9 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("question")
         }
 
-        let modeString = (args["mode"] as? AnyCodable).flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? "hybrid"
+        let modeString = args["mode"].flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? "hybrid"
         let mode = SearchMode(rawValue: modeString) ?? .hybrid
-        let topK = (args["top_k"] as? AnyCodable).flatMap { if case .int(let i) = $0 { return i } else { return nil } } ?? 40
+        let topK = args["top_k"].flatMap { if case .int(let i) = $0 { return i } else { return nil } } ?? 40
 
         let response = try await lightRAGClient.query(question, mode: mode, topK: topK, onlyNeedContext: false)
         return response.response
@@ -215,7 +215,7 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("text")
         }
 
-        let description = (args["description"] as? AnyCodable).flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
+        let description = args["description"].flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
 
         let response = try await lightRAGClient.insertText(text, description: description)
         return "Inserted successfully. Status: \(response.status), Track ID: \(response.trackId)"
@@ -229,7 +229,7 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("type")
         }
 
-        let description = (args["description"] as? AnyCodable).flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
+        let description = args["description"].flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
 
         let request = EntityCreateRequest(entityName: name, entityType: type, description: description)
         try await lightRAGClient.createEntity(request)
@@ -247,7 +247,7 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("description")
         }
 
-        let keywords = (args["keywords"] as? AnyCodable).flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
+        let keywords = args["keywords"].flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
 
         let request = RelationCreateRequest(srcEntity: source, tgtEntity: target, description: description, keywords: keywords)
         try await lightRAGClient.createRelation(request)
@@ -259,8 +259,8 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("label")
         }
 
-        let searchText = (args["search_text"] as? AnyCodable).flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
-        let maxItems = (args["max_items"] as? AnyCodable).flatMap { if case .int(let i) = $0 { return i } else { return nil } } ?? 50
+        let searchText = args["search_text"].flatMap { if case .string(let s) = $0 { return s } else { return nil } } ?? ""
+        let maxItems = args["max_items"].flatMap { if case .int(let i) = $0 { return i } else { return nil } } ?? 50
 
         let response = try await lightRAGClient.searchGraph(label: label, searchText: searchText, maxItems: maxItems)
 
