@@ -4,11 +4,11 @@ import SwiftUI
 struct ModelsStepView: View {
     @Bindable var viewModel: InstallerViewModel
 
-    private var modelOptions: [(id: String, name: String, size: String, ramLabel: String, ramGB: UInt64)] {
+    private var modelOptions: [(id: String, name: String, size: String, ramLabel: String, ramGB: UInt64, peakRamNote: String)] {
         [
-            ("qwen2.5:7b", InstallerL10n.Models.qwen7b, InstallerL10n.Models.size45, InstallerL10n.Models.ram8, 8),
-            ("qwen2.5:14b", InstallerL10n.Models.qwen14b, InstallerL10n.Models.size9, InstallerL10n.Models.ram16, 16),
-            ("qwen2.5:32b", InstallerL10n.Models.qwen32b, InstallerL10n.Models.size20, InstallerL10n.Models.ram32, 32),
+            ("qwen2.5:7b", InstallerL10n.Models.qwen7b, InstallerL10n.Models.size45, InstallerL10n.Models.ram8, 8, InstallerL10n.Models.peakRam7b),
+            ("qwen2.5:14b", InstallerL10n.Models.qwen14b, InstallerL10n.Models.size9, InstallerL10n.Models.ram16, 16, InstallerL10n.Models.peakRam14b),
+            ("qwen2.5:32b", InstallerL10n.Models.qwen32b, InstallerL10n.Models.size20, InstallerL10n.Models.ram32, 32, InstallerL10n.Models.peakRam32b),
         ]
     }
 
@@ -45,6 +45,11 @@ struct ModelsStepView: View {
                 ForEach(modelOptions, id: \.id) { model in
                     modelCard(model)
                 }
+
+                Text(InstallerL10n.Models.ramDisclaimer)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()
@@ -78,9 +83,14 @@ struct ModelsStepView: View {
                                     .cornerRadius(4)
                             }
                         }
-                        Text(embeddingModelSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(embeddingModelSubtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(InstallerL10n.Models.peakRamEmbed)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             }
@@ -158,7 +168,7 @@ struct ModelsStepView: View {
         return InstallerL10n.Models.embeddingSubPending
     }
 
-    private func modelCard(_ model: (id: String, name: String, size: String, ramLabel: String, ramGB: UInt64)) -> some View {
+    private func modelCard(_ model: (id: String, name: String, size: String, ramLabel: String, ramGB: UInt64, peakRamNote: String)) -> some View {
         let isRecommended = model.id == viewModel.recommendedModel
         let hasEnoughRAM = viewModel.systemRAM >= model.ramGB
         let isInstalled = viewModel.isOllamaModelInstalled(model.id)
@@ -205,6 +215,10 @@ struct ModelsStepView: View {
                                 .foregroundStyle(hasEnoughRAM ? Color.secondary : Color.red)
                         }
                     }
+                    Text(model.peakRamNote)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer()

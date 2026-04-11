@@ -92,6 +92,11 @@
 "installer.models.ram.8gb" = "8 GB";
 "installer.models.ram.16gb" = "16 GB";
 "installer.models.ram.32gb" = "32 GB";
+"installer.models.peak_ram.7b" = "~5–6 GB RAM while generating (inference).";
+"installer.models.peak_ram.14b" = "~9–12 GB RAM while generating (inference).";
+"installer.models.peak_ram.32b" = "~20–24 GB RAM while generating (inference).";
+"installer.models.peak_ram.embed" = "~0.3–0.5 GB RAM while embedding runs (inference).";
+"installer.models.ram_disclaimer" = "These figures are approximate peaks during processing, not fixed baseline memory for your Mac. RAM is not permanently reserved: it is released when Ollama unloads the model or after idle timeout, depending on Ollama settings and context length.";
 
 /* Download */
 "installer.download.title" = "Installing Components";

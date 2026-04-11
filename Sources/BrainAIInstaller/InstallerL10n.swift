@@ -162,6 +162,11 @@ enum InstallerL10n {
         static var ram8: String { lookup("installer.models.ram.8gb") }
         static var ram16: String { lookup("installer.models.ram.16gb") }
         static var ram32: String { lookup("installer.models.ram.32gb") }
+        static var peakRam7b: String { lookup("installer.models.peak_ram.7b") }
+        static var peakRam14b: String { lookup("installer.models.peak_ram.14b") }
+        static var peakRam32b: String { lookup("installer.models.peak_ram.32b") }
+        static var peakRamEmbed: String { lookup("installer.models.peak_ram.embed") }
+        static var ramDisclaimer: String { lookup("installer.models.ram_disclaimer") }
     }
 
     // MARK: - Download / tasks

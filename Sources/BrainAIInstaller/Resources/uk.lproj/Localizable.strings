@@ -92,6 +92,11 @@
 "installer.models.ram.8gb" = "8 ГБ";
 "installer.models.ram.16gb" = "16 ГБ";
 "installer.models.ram.32gb" = "32 ГБ";
+"installer.models.peak_ram.7b" = "~5–6 ГБ ОЗП під час генерації відповіді (інференс).";
+"installer.models.peak_ram.14b" = "~9–12 ГБ ОЗП під час генерації відповіді (інференс).";
+"installer.models.peak_ram.32b" = "~20–24 ГБ ОЗП під час генерації відповіді (інференс).";
+"installer.models.peak_ram.embed" = "~0,3–0,5 ГБ ОЗП під час ембеддингу (інференс).";
+"installer.models.ram_disclaimer" = "Це орієнтовний пік споживання ОЗП під час роботи моделі, а не постійне «зайняття» пам’яті всього Mac. Пам’ять не резервована назавжди: вона звільняється, коли Ollama вивантажує модель або після простою — залежно від налаштувань Ollama та довжини контексту.";
 
 /* Download */
 "installer.download.title" = "Встановлення компонентів";
