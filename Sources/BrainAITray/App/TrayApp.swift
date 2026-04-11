@@ -22,6 +22,8 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     private let systemMonitor = SystemMonitor()
     private let serviceOrchestrator: ServiceOrchestrator
     private var updateTimer: Timer?
+    private var ollamaRunning = false
+    private var lightRAGRunning = false
 
     override init() {
         let ollamaManager = OllamaProcessManager(port: UInt16(AppConfiguration.shared.ollamaPort))
@@ -65,11 +67,11 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(titleItem)
         menu.addItem(NSMenuItem.separator())
 
-        // Service statuses
-        let lightragStatus = makeStatusItem(name: "LightRAG", isRunning: false)
+        // Service statuses (async check happens in background)
+        let lightragStatus = makeStatusItem(name: "LightRAG", isRunning: lightRAGRunning)
         menu.addItem(lightragStatus)
 
-        let ollamaStatus = makeStatusItem(name: "Ollama", isRunning: false)
+        let ollamaStatus = makeStatusItem(name: "Ollama", isRunning: ollamaRunning)
         menu.addItem(ollamaStatus)
 
         menu.addItem(NSMenuItem.separator())
@@ -198,11 +200,32 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
     private func startMonitoring() {
         systemMonitor.update()
+        checkServiceStatuses()
         rebuildMenu()
 
         updateTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
             self?.systemMonitor.update()
+            self?.checkServiceStatuses()
             self?.rebuildMenu()
+        }
+    }
+
+    private func checkServiceStatuses() {
+        Task {
+            let ollamaAPI = OllamaAPIClient(
+                baseURL: "http://localhost:\(AppConfiguration.shared.ollamaPort)"
+            )
+            let isOllamaHealthy = try? await ollamaAPI.healthCheck()
+            await MainActor.run {
+                ollamaRunning = isOllamaHealthy == true
+            }
+
+            let lightragClient = LocalLightRAGClient()
+            let health = try? await lightragClient.healthCheck()
+            await MainActor.run {
+                lightRAGRunning = health != nil
+                rebuildMenu()
+            }
         }
     }
 
@@ -216,7 +239,22 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        // TODO: Launch BrainAISettings app
+        // Launch BrainAISettings as a separate process
+        let settingsPath = Bundle.main.bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("BrainAISettings")
+
+        if FileManager.default.fileExists(atPath: settingsPath.path) {
+            let task = Process()
+            task.executableURL = settingsPath
+            try? task.run()
+        } else {
+            // Fallback: try to find it as a .app bundle
+            let appPath = Bundle.main.bundleURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("BrainAI Settings.app")
+            NSWorkspace.shared.open(appPath)
+        }
     }
 
     @objc private func quitApp() {

@@ -43,6 +43,22 @@ public final class WorkspaceManager: @unchecked Sendable {
         }
     }
 
+    // MARK: - Thread-safe accessors (sync only)
+
+    private func lockedWorkspaces() -> [Workspace] {
+        lock.lock()
+        defer { lock.unlock() }
+        return workspaces
+    }
+
+    private func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body()
+    }
+
+    // MARK: - CRUD
+
     /// Create a new workspace
     /// - Parameters:
     ///   - name: Display name
@@ -50,57 +66,53 @@ public final class WorkspaceManager: @unchecked Sendable {
     ///   - template: Optional template name
     /// - Returns: The created workspace
     public func create(name: String, slug: String, template: String? = nil) async throws -> Workspace {
-        lock.lock()
-        defer { lock.unlock() }
+        let workspace: Workspace = try withLock {
+            // Ensure slug is unique
+            if workspaces.contains(where: { $0.slug == slug }) {
+                throw BrainAIError.workspaceError("Workspace with slug '\(slug)' already exists")
+            }
 
-        // Ensure slug is unique
-        if workspaces.contains(where: { $0.slug == slug }) {
-            throw BrainAIError.workspaceError("Workspace with slug '\(slug)' already exists")
+            // Find available port
+            let usedPorts = workspaces.map { $0.port }
+            var port: UInt16 = 8001
+            while usedPorts.contains(port) {
+                port += 1
+            }
+
+            // Create data directory
+            let dataPath = workspacesDirectory.appendingPathComponent(slug)
+            try FileManager.default.createDirectory(at: dataPath, withIntermediateDirectories: true)
+
+            let ws = Workspace(
+                name: name,
+                slug: slug,
+                port: port,
+                dataPath: dataPath
+            )
+
+            workspaces.append(ws)
+            return ws
         }
 
-        // Find available port
-        let usedPorts = workspaces.map { $0.port }
-        var port: UInt16 = 8001
-        while usedPorts.contains(port) {
-            port += 1
-        }
-
-        // Create data directory
-        let dataPath = workspacesDirectory.appendingPathComponent(slug)
-        try FileManager.default.createDirectory(at: dataPath, withIntermediateDirectories: true)
-
-        let workspace = Workspace(
-            name: name,
-            slug: slug,
-            port: port,
-            dataPath: dataPath
-        )
-
-        workspaces.append(workspace)
         try await saveWorkspaces()
-
         return workspace
     }
 
     /// Delete a workspace
     /// - Parameter id: Workspace identifier
     public func delete(id: UUID) async throws {
-        lock.lock()
-        defer { lock.unlock() }
+        try withLock {
+            guard let index = workspaces.firstIndex(where: { $0.id == id }) else {
+                throw BrainAIError.workspaceError("Workspace not found: \(id)")
+            }
 
-        guard let index = workspaces.firstIndex(where: { $0.id == id }) else {
-            throw BrainAIError.workspaceError("Workspace not found: \(id)")
-        }
+            let workspace = workspaces[index]
+            try FileManager.default.removeItem(at: workspace.dataPath)
+            workspaces.remove(at: index)
 
-        let workspace = workspaces[index]
-
-        // Remove data directory
-        try FileManager.default.removeItem(at: workspace.dataPath)
-
-        workspaces.remove(at: index)
-
-        if activeWorkspace?.id == id {
-            activeWorkspace = nil
+            if activeWorkspace?.id == id {
+                activeWorkspace = nil
+            }
         }
 
         try await saveWorkspaces()
@@ -109,64 +121,55 @@ public final class WorkspaceManager: @unchecked Sendable {
     /// Start a workspace's services
     /// - Parameter id: Workspace identifier
     public func start(id: UUID) async throws {
-        guard workspaces.contains(where: { $0.id == id }) else {
+        let exists = lockedWorkspaces().contains(where: { $0.id == id })
+        guard exists else {
             throw BrainAIError.workspaceError("Workspace not found: \(id)")
         }
-
-        // Note: Actual service starting would be handled by ServiceOrchestrator
-        // This method is a placeholder for workspace-level start logic
+        // Actual service starting handled by ServiceOrchestrator
     }
 
     /// Stop a workspace's services
     /// - Parameter id: Workspace identifier
     public func stop(id: UUID) async throws {
-        guard workspaces.contains(where: { $0.id == id }) else {
+        let exists = lockedWorkspaces().contains(where: { $0.id == id })
+        guard exists else {
             throw BrainAIError.workspaceError("Workspace not found: \(id)")
         }
-
-        // Note: Actual service stopping would be handled by ServiceOrchestrator
-        // This method is a placeholder for workspace-level stop logic
+        // Actual service stopping handled by ServiceOrchestrator
     }
+
+    // MARK: - Cross-workspace Query
 
     /// Query all workspaces
     /// - Parameters:
     ///   - question: The question to ask
     ///   - mode: Search mode to use
     /// - Returns: Array of results from each workspace
-    public func queryAll(question: String, mode: SearchMode = .hybrid) async throws -> [WorkspaceQueryResult] {
+    public func queryAll(question: String, mode: SearchMode = .hybrid) async -> [WorkspaceQueryResult] {
+        let workspacesCopy = lockedWorkspaces()
         var results: [WorkspaceQueryResult] = []
 
-        lock.lock()
-        let workspacesCopy = workspaces
-        lock.unlock()
-
         for workspace in workspacesCopy {
-            do {
-                // Placeholder: In a real implementation, this would query LightRAG
-                let response = QueryResponse(
-                    response: "Response from \(workspace.name)",
-                    references: []
-                )
-                let result = WorkspaceQueryResult(
-                    workspace: workspace,
-                    result: response,
-                    relevanceScore: 0.5
-                )
-                results.append(result)
-            } catch {
-                // Continue with next workspace on error
-                continue
-            }
+            // Placeholder: In a real implementation, this would query LightRAG
+            let response = QueryResponse(
+                response: "Response from \(workspace.name)",
+                references: []
+            )
+            let result = WorkspaceQueryResult(
+                workspace: workspace,
+                result: response,
+                relevanceScore: 0.5
+            )
+            results.append(result)
         }
 
         return results
     }
 
+    // MARK: - Persistence
+
     /// Load workspaces from disk
     private func loadWorkspaces() async {
-        lock.lock()
-        defer { lock.unlock() }
-
         let configPath = workspacesDirectory.appendingPathComponent("workspaces.json")
 
         guard FileManager.default.fileExists(atPath: configPath.path) else {
@@ -177,18 +180,17 @@ public final class WorkspaceManager: @unchecked Sendable {
             let data = try Data(contentsOf: configPath)
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
-            workspaces = try decoder.decode([Workspace].self, from: data)
+            let loaded = try decoder.decode([Workspace].self, from: data)
+
+            withLock { workspaces = loaded }
         } catch {
-            // Log error, start with empty workspaces
-            workspaces = []
+            withLock { workspaces = [] }
         }
     }
 
     /// Save workspaces to disk
     private func saveWorkspaces() async throws {
-        lock.lock()
-        let workspacesCopy = workspaces
-        lock.unlock()
+        let workspacesCopy = lockedWorkspaces()
 
         try workspacesDirectory.ensureDirectoryExists()
 

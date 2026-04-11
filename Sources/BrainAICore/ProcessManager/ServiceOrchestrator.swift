@@ -22,13 +22,26 @@ public final class ServiceOrchestrator: @unchecked Sendable {
         self.lightRAGInstances = lightRAGInstances
     }
 
+    // MARK: - Thread-safe accessors (sync only, never called from async)
+
+    private func lockedInstances() -> [UUID: LightRAGProcessManager] {
+        lock.lock()
+        defer { lock.unlock() }
+        return lightRAGInstances
+    }
+
+    private func lockedInstance(for id: UUID) -> LightRAGProcessManager? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lightRAGInstances[id]
+    }
+
+    // MARK: - Status
+
     /// Overall status of all services
     public func overallStatus() async -> ProcessStatus {
         let ollamaStatus = await ollama.status
-
-        lock.lock()
-        let instances = Array(lightRAGInstances.values)
-        lock.unlock()
+        let instances = Array(lockedInstances().values)
 
         var lightRAGStatuses: [ProcessStatus] = []
         for instance in instances {
@@ -53,23 +66,19 @@ public final class ServiceOrchestrator: @unchecked Sendable {
                 if case .stopped = status { return true }
                 return false
             }
-            if allGood {
-                return .running
-            } else {
-                return .starting
-            }
+            return allGood ? .running : .starting
         }
     }
+
+    // MARK: - Lifecycle
 
     /// Start all services
     /// - Throws: BrainAIError if any service fails to start
     public func startAll() async throws {
         try await ollama.start()
 
-        lock.lock()
-        defer { lock.unlock() }
-
-        for (_, manager) in lightRAGInstances {
+        let instances = lockedInstances()
+        for (_, manager) in instances {
             try await manager.start()
         }
     }
@@ -77,14 +86,10 @@ public final class ServiceOrchestrator: @unchecked Sendable {
     /// Stop all services
     /// - Throws: BrainAIError if any service fails to stop
     public func stopAll() async throws {
-        lock.lock()
-        let instancesCopy = lightRAGInstances
-        lock.unlock()
-
-        for (_, manager) in instancesCopy {
+        let instances = lockedInstances()
+        for (_, manager) in instances {
             try await manager.stop()
         }
-
         try await ollama.stop()
     }
 
@@ -92,14 +97,9 @@ public final class ServiceOrchestrator: @unchecked Sendable {
     /// - Parameter id: Workspace identifier
     /// - Throws: BrainAIError if workspace not found or cannot be started
     public func startWorkspace(_ id: UUID) async throws {
-        lock.lock()
-        let manager = lightRAGInstances[id]
-        lock.unlock()
-
-        guard let manager else {
+        guard let manager = lockedInstance(for: id) else {
             throw BrainAIError.workspaceError("LightRAG instance not found for workspace: \(id)")
         }
-
         try await manager.start()
     }
 
@@ -107,14 +107,9 @@ public final class ServiceOrchestrator: @unchecked Sendable {
     /// - Parameter id: Workspace identifier
     /// - Throws: BrainAIError if workspace not found or cannot be stopped
     public func stopWorkspace(_ id: UUID) async throws {
-        lock.lock()
-        let manager = lightRAGInstances[id]
-        lock.unlock()
-
-        guard let manager else {
+        guard let manager = lockedInstance(for: id) else {
             throw BrainAIError.workspaceError("LightRAG instance not found for workspace: \(id)")
         }
-
         try await manager.stop()
     }
 
@@ -125,7 +120,6 @@ public final class ServiceOrchestrator: @unchecked Sendable {
     public func registerWorkspace(_ id: UUID, manager: LightRAGProcessManager) {
         lock.lock()
         defer { lock.unlock() }
-
         lightRAGInstances[id] = manager
     }
 
@@ -134,7 +128,6 @@ public final class ServiceOrchestrator: @unchecked Sendable {
     public func unregisterWorkspace(_ id: UUID) {
         lock.lock()
         defer { lock.unlock() }
-
         lightRAGInstances.removeValue(forKey: id)
     }
 }

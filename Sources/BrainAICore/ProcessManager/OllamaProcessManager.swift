@@ -51,7 +51,6 @@ public actor OllamaProcessManager: ManagedProcess {
                 .appendingPathComponent(".ollama/bin/ollama").path,
         ]
 
-        var process: Process?
         var executablePath: String?
 
         for path in ollamaPaths {
