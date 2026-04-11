@@ -1,5 +1,4 @@
 import SwiftUI
-import BrainAICore
 
 // MARK: - Sidebar Section Enum
 
@@ -36,46 +35,35 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
-// MARK: - Main App
+// MARK: - Root view (hosted in NSWindow for SPM executable)
 
-@main
-struct BrainAIApp: App {
+struct BrainAIAppContentView: View {
     @State private var selectedTab: SidebarSection? = .dashboard
     @State private var showSearchOverlay = false
 
-    var body: some Scene {
-        WindowGroup {
-            NavigationSplitView {
-                List(SidebarSection.allCases, selection: $selectedTab) { section in
-                    Label(section.title, systemImage: section.systemImage)
-                        .tag(section)
-                }
-                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
-                .listStyle(.sidebar)
-            } detail: {
-                detailView
+    var body: some View {
+        NavigationSplitView {
+            List(SidebarSection.allCases, selection: $selectedTab) { section in
+                Label(section.title, systemImage: section.systemImage)
+                    .tag(section)
             }
-            .navigationSplitViewStyle(.balanced)
-            .frame(minWidth: 900, minHeight: 600)
-            .overlay {
-                if showSearchOverlay {
-                    searchOverlayView
-                }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+            .listStyle(.sidebar)
+        } detail: {
+            detailView
+        }
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 900, minHeight: 600)
+        .overlay {
+            if showSearchOverlay {
+                searchOverlayView
             }
         }
-        .defaultSize(width: 1100, height: 700)
-        .commands {
-            CommandGroup(after: .textEditing) {
-                Button("Quick Search") {
-                    showSearchOverlay.toggle()
-                }
-                .keyboardShortcut("k", modifiers: .command)
-
-                Button("New Note") {
-                    selectedTab = .notes
-                }
-                .keyboardShortcut("n", modifiers: .command)
-            }
+        .onReceive(NotificationCenter.default.publisher(for: .brainAIQuickSearch)) { _ in
+            showSearchOverlay.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .brainAINewNote)) { _ in
+            selectedTab = .notes
         }
     }
 

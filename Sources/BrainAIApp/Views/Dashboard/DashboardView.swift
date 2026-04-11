@@ -3,7 +3,8 @@ import BrainAICore
 
 // MARK: - Dashboard ViewModel
 
-/// ViewModel for Dashboard screen with real-time data
+/// ViewModel for Dashboard screen with real-time data.
+/// Network I/O runs off the main actor so the UI stays responsive (avoids “application not responding”).
 @Observable
 final class DashboardViewModel: @unchecked Sendable {
     // MARK: - Stats
@@ -43,8 +44,8 @@ final class DashboardViewModel: @unchecked Sendable {
     // MARK: - Initialization
 
     init(
-        lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(),
-        ollamaClient: OllamaAPIClient = OllamaAPIClient(),
+        lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(requestTimeout: 3),
+        ollamaClient: OllamaAPIClient = OllamaAPIClient(requestTimeout: 3),
         workspaceManager: WorkspaceManager? = nil,
         config: AppConfiguration = AppConfiguration.shared
     ) {
@@ -58,119 +59,106 @@ final class DashboardViewModel: @unchecked Sendable {
 
     /// Load dashboard data
     func loadData() async {
-        isLoading = true
-        errorMessage = nil
-
-        await loadServiceStatuses()
-        await loadWorkspaceInfo()
-        await loadStats()
-        loadRecentActivity()
-
-        isLoading = false
-    }
-
-    /// Load service statuses (Ollama and LightRAG)
-    private func loadServiceStatuses() async {
-        // Check Ollama status
-        do {
-            let isRunning = try await ollamaClient.healthCheck()
-            await MainActor.run {
-                ollamaStatus = ServiceStatusInfo(
-                    isRunning: isRunning,
-                    statusText: isRunning ? "Running" : "Stopped"
-                )
-            }
-        } catch {
-            await MainActor.run {
-                ollamaStatus = ServiceStatusInfo(isRunning: false, statusText: "Stopped")
-            }
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
         }
 
-        // Check LightRAG status
-        do {
-            let response = try await lightRAGClient.healthCheck()
-            await MainActor.run {
-                lightRAGStatus = ServiceStatusInfo(
-                    isRunning: response.status.lowercased() == "ok",
-                    statusText: response.status.lowercased() == "ok" ? "Running" : "Error"
-                )
-            }
-        } catch {
-            await MainActor.run {
-                lightRAGStatus = ServiceStatusInfo(isRunning: false, statusText: "Stopped")
-            }
+        let ol = ollamaClient
+        let lr = lightRAGClient
+        let (activeWorkspace, workspacesCount) = await MainActor.run {
+            (workspaceManager?.activeWorkspace, workspaceManager?.workspaces.count ?? 0)
         }
-    }
 
-    /// Load workspace information
-    private func loadWorkspaceInfo() async {
-        guard let workspace = workspaceManager?.activeWorkspace else {
-            return
-        }
+        let refresh = await Task.detached(priority: .utility) {
+            async let ollamaRunning = Self.fetchOllamaHealth(ol)
+            async let lightStatus = Self.fetchLightRAGHealth(lr)
+            async let stats = Self.fetchDocumentStats(lr, workspacesCount: workspacesCount)
+
+            let o = await ollamaRunning
+            let l = await lightStatus
+            let s = await stats
+            let workspaceUI = Self.workspaceFields(from: activeWorkspace)
+            let recent = Self.placeholderRecentActivities()
+
+            return (
+                ollama: ServiceStatusInfo(isRunning: o, statusText: o ? "Running" : "Stopped"),
+                lightRAG: l,
+                stats: s,
+                workspaceUI: workspaceUI,
+                recent: recent
+            )
+        }.value
 
         await MainActor.run {
-            activeWorkspaceName = workspace.name
-            activeWorkspaceStatus = "Active"
-
-            // Build provider roles list
-            var roles: [String] = []
-            if workspace.embeddingRole != nil {
-                roles.append("Embedding")
-            }
-            if workspace.extractionRole != nil {
-                roles.append("Extraction")
-            }
-            if workspace.rerankerRole != nil {
-                roles.append("Reranking")
-            }
-            if workspace.generationRole != nil {
-                roles.append("Generation")
-            }
-
-            // Fallback to global config roles if workspace doesn't override
-            if roles.isEmpty {
-                roles.append("Embedding")
-                roles.append("Extraction")
-                roles.append("Generation")
-            }
-
-            providerRoles = roles
+            ollamaStatus = refresh.ollama
+            lightRAGStatus = refresh.lightRAG
+            entitiesCount = refresh.stats.entities
+            relationsCount = refresh.stats.relations
+            documentsCount = refresh.stats.documents
+            activeWorkspacesCount = refresh.stats.workspaces
+            activeWorkspaceName = refresh.workspaceUI.name
+            activeWorkspaceStatus = refresh.workspaceUI.status
+            providerRoles = refresh.workspaceUI.roles
+            recentActivities = refresh.recent
+            isLoading = false
         }
     }
 
-    /// Load statistics from LightRAG
-    private func loadStats() async {
+    private nonisolated static func fetchOllamaHealth(_ client: OllamaAPIClient) async -> Bool {
         do {
-            // Try to get document count via list documents API
-            let response = try await lightRAGClient.listDocuments(
-                page: 1,
-                pageSize: 1,
-                status: nil
-            )
-
-            await MainActor.run {
-                self.documentsCount = response.total
-                // Placeholder values - in a real scenario, these would come from dedicated endpoints
-                self.entitiesCount = max(response.total * 10, 42)
-                self.relationsCount = max(response.total * 15, 87)
-                self.activeWorkspacesCount = (workspaceManager?.workspaces.count ?? 0)
-            }
+            return try await client.healthCheck()
         } catch {
-            // Use placeholder values if API fails
-            await MainActor.run {
-                self.entitiesCount = 42
-                self.relationsCount = 87
-                self.documentsCount = 12
-                self.activeWorkspacesCount = (workspaceManager?.workspaces.count ?? 1)
-            }
+            return false
         }
     }
 
-    /// Load recent activity (placeholder implementation)
-    private func loadRecentActivity() {
-        // Placeholder recent activities
+    private nonisolated static func fetchLightRAGHealth(_ client: LocalLightRAGClient) async -> ServiceStatusInfo {
+        do {
+            let response = try await client.healthCheck()
+            let ok = response.status.lowercased() == "ok"
+            return ServiceStatusInfo(isRunning: ok, statusText: ok ? "Running" : "Error")
+        } catch {
+            return ServiceStatusInfo(isRunning: false, statusText: "Stopped")
+        }
+    }
+
+    private nonisolated static func fetchDocumentStats(
+        _ client: LocalLightRAGClient,
+        workspacesCount: Int
+    ) async -> (entities: Int, relations: Int, documents: Int, workspaces: Int) {
+        do {
+            let response = try await client.listDocuments(page: 1, pageSize: 1, status: nil)
+            return (
+                entities: max(response.total * 10, 42),
+                relations: max(response.total * 15, 87),
+                documents: response.total,
+                workspaces: workspacesCount
+            )
+        } catch {
+            return (42, 87, 12, max(workspacesCount, 1))
+        }
+    }
+
+    private nonisolated static func workspaceFields(from workspace: Workspace?) -> (name: String, status: String, roles: [String]) {
+        guard let workspace else {
+            return ("No Workspace", "Inactive", [])
+        }
+
+        var roles: [String] = []
+        if workspace.embeddingRole != nil { roles.append("Embedding") }
+        if workspace.extractionRole != nil { roles.append("Extraction") }
+        if workspace.rerankerRole != nil { roles.append("Reranking") }
+        if workspace.generationRole != nil { roles.append("Generation") }
+        if roles.isEmpty {
+            roles = ["Embedding", "Extraction", "Generation"]
+        }
+        return (workspace.name, "Active", roles)
+    }
+
+    private nonisolated static func placeholderRecentActivities() -> [ActivityItem] {
         let now = Date()
-        recentActivities = [
+        return [
             ActivityItem(
                 type: .documentInserted,
                 title: "Document inserted",
@@ -259,6 +247,7 @@ struct DashboardView: View {
             }
         }
         .task {
+            await Task.yield()
             await viewModel.loadData()
         }
         .navigationTitle("Dashboard")
