@@ -40,9 +40,11 @@ public actor OllamaAPIClient {
     private let encoder: JSONEncoder
 
     /// Initializes the Ollama API client
-    /// - Parameter baseURL: Base URL for Ollama API (default: http://localhost:11434)
-    public init(baseURL: String = "http://localhost:11434") {
-        self.httpClient = HTTPClient(baseURL: baseURL)
+    /// - Parameters:
+    ///   - baseURL: Base URL for Ollama API (default: http://localhost:11434)
+    ///   - requestTimeout: Per-request timeout in seconds (default: 30)
+    public init(baseURL: String = "http://localhost:11434", requestTimeout: TimeInterval = 30) {
+        self.httpClient = HTTPClient(baseURL: baseURL, timeout: requestTimeout)
 
         // Configure decoder for snake_case
         self.decoder = JSONDecoder()

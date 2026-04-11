@@ -60,9 +60,10 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
     /// - Parameters:
     ///   - host: Hostname (default: "localhost")
     ///   - port: Port number (default: 9621)
-    public init(host: String = "localhost", port: UInt16 = 9621) {
+    ///   - requestTimeout: Per-request timeout in seconds (default: 30)
+    public init(host: String = "localhost", port: UInt16 = 9621, requestTimeout: TimeInterval = 30) {
         let baseURL = "http://\(host):\(port)"
-        self.httpClient = HTTPClient(baseURL: baseURL)
+        self.httpClient = HTTPClient(baseURL: baseURL, timeout: requestTimeout)
     }
 
     // MARK: - LightRAGClientProtocol Conformance

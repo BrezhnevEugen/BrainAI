@@ -168,7 +168,9 @@ public final class AppConfiguration: @unchecked Sendable {
 
     // MARK: - Private Properties
 
-    private let lock = NSLock()
+    /// Recursive: `loadFromUserDefaults()` holds the lock while assigning properties; each `didSet`
+    /// calls `saveToUserDefaults()`, which must re-enter the same lock on the main thread (non-recursive `NSLock` deadlocks).
+    private let lock = NSRecursiveLock()
 
     // MARK: - Initialization
 
