@@ -13,6 +13,17 @@ struct ServerTab: View {
     @State private var ollamaManager: OllamaProcessManager?
     @State private var lightRAGManager: LightRAGProcessManager?
 
+    // Remote connection
+    @State private var remoteManager = RemoteConnectionManager()
+    @State private var remoteURL = ""
+    @State private var remoteAuthToken = ""
+    @State private var tlsPinnedHashes = ""
+    @State private var testingConnection = false
+    @State private var connectionTestResult: String?
+
+    // MCP connections
+    @State private var mcpManager = MCPClientManager()
+
     var body: some View {
         Form {
             // MARK: - Ollama Service
@@ -106,7 +117,7 @@ struct ServerTab: View {
                     HStack {
                         Text("Remote URL")
                         Spacer()
-                        TextField("https://...", text: remoteURLBinding)
+                        TextField("https://lightrag.example.com", text: $remoteURL)
                             .frame(width: 260)
                             .multilineTextAlignment(.trailing)
                     }
@@ -114,17 +125,98 @@ struct ServerTab: View {
                     HStack {
                         Text("Auth Token")
                         Spacer()
-                        SecureField("Bearer token", text: .constant(""))
+                        SecureField("Bearer token", text: $remoteAuthToken)
                             .frame(width: 260)
                             .multilineTextAlignment(.trailing)
                     }
 
-                    Button("Test Connection") {
-                        // Test remote connection
+                    HStack {
+                        Text("TLS Pin Hashes")
+                        Spacer()
+                        TextField("SHA-256 (comma-separated)", text: $tlsPinnedHashes)
+                            .frame(width: 260)
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    // Connection status
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        RemoteConnectionStatusView(state: remoteManager.connectionState, latency: remoteManager.lastLatency)
+                    }
+
+                    // Health info
+                    if let info = remoteManager.serverInfo {
+                        HStack {
+                            Text("Server")
+                            Spacer()
+                            Text(info.status)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    HStack {
+                        Spacer()
+
+                        if remoteManager.connectionState.isConnected {
+                            Button("Disconnect") {
+                                remoteManager.disconnect()
+                            }
+                        } else {
+                            Button("Connect") {
+                                Task { await connectRemote() }
+                            }
+                            .disabled(remoteURL.isEmpty || testingConnection)
+                        }
+
+                        Button("Test") {
+                            Task { await testRemoteConnection() }
+                        }
+                        .disabled(remoteURL.isEmpty || testingConnection)
+                    }
+
+                    if let result = connectionTestResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(result.hasPrefix("Success") ? Color.green : Color.red)
                     }
                 }
             } header: {
                 Label("Connection", systemImage: "network")
+            }
+
+            // MARK: - MCP Connections
+            Section {
+                if mcpManager.connections.isEmpty {
+                    Text("No MCP servers connected")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(mcpManager.connections) { conn in
+                        HStack {
+                            Circle()
+                                .fill(mcpStatusColor(conn.status))
+                                .frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(conn.serverName)
+                                    .font(.callout)
+                                Text("\(conn.toolCount) tools")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if case .connected = conn.status {
+                                Button("Disconnect") {
+                                    Task { await mcpManager.disconnect(id: conn.id) }
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Label("MCP Servers", systemImage: "point.3.connected.trianglepath.dotted")
+            } footer: {
+                Text("Connect to external MCP servers to extend BrainAI with additional tools and data sources.")
             }
 
             // MARK: - Keep Alive
@@ -158,13 +250,47 @@ struct ServerTab: View {
         .onAppear { refreshStatuses() }
     }
 
-    // MARK: - Bindings
+    // MARK: - Remote Connection
 
-    private var remoteURLBinding: Binding<String> {
-        Binding(
-            get: { config.remoteOllamaURL?.absoluteString ?? "" },
-            set: { config.remoteOllamaURL = $0.isEmpty ? nil : URL(string: $0) }
+    private func connectRemote() async {
+        let hashes = tlsPinnedHashes
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        let remoteConfig = RemoteConnectionConfig(
+            baseURL: remoteURL,
+            authToken: remoteAuthToken.isEmpty ? nil : remoteAuthToken,
+            tlsPinnedHashes: hashes
         )
+
+        await remoteManager.connect(config: remoteConfig)
+    }
+
+    private func testRemoteConnection() async {
+        testingConnection = true
+        connectionTestResult = nil
+
+        let client = RemoteLightRAGClient(baseURL: remoteURL, authToken: remoteAuthToken.isEmpty ? nil : remoteAuthToken)
+        let startTime = Date()
+
+        do {
+            let health = try await client.healthCheck()
+            let latency = Int(Date().timeIntervalSince(startTime) * 1000)
+            connectionTestResult = "Success: \(health.status) (\(latency)ms)"
+        } catch {
+            connectionTestResult = "Failed: \(error.localizedDescription)"
+        }
+
+        testingConnection = false
+    }
+
+    private func mcpStatusColor(_ status: MCPConnectionStatus) -> Color {
+        switch status {
+        case .connected: return .green
+        case .disconnected: return .gray
+        case .error: return .red
+        }
     }
 
     // MARK: - Actions
@@ -245,6 +371,33 @@ struct ServerTab: View {
             lightRAGStatus = .running
         } catch {
             lightRAGStatus = .error(error.localizedDescription)
+        }
+    }
+}
+
+// MARK: - Remote Connection Status View
+
+struct RemoteConnectionStatusView: View {
+    let state: RemoteConnectionState
+    let latency: TimeInterval
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+            Text(state.displayString)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var statusColor: Color {
+        switch state {
+        case .connected: return .green
+        case .connecting: return .yellow
+        case .disconnected: return .gray
+        case .error: return .red
         }
     }
 }

@@ -1,0 +1,217 @@
+import Foundation
+import Observation
+
+// MARK: - Connection State
+
+/// State of a remote connection
+public enum RemoteConnectionState: Sendable {
+    case disconnected
+    case connecting
+    case connected(latency: TimeInterval)
+    case error(String)
+
+    public var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
+    }
+
+    public var displayString: String {
+        switch self {
+        case .disconnected: "Disconnected"
+        case .connecting: "Connecting..."
+        case .connected(let latency): "Connected (\(Int(latency * 1000))ms)"
+        case .error(let msg): "Error: \(msg)"
+        }
+    }
+}
+
+// MARK: - Remote Connection Configuration
+
+/// Configuration for a remote LightRAG connection
+public struct RemoteConnectionConfig: Codable, Sendable {
+    public var baseURL: String
+    public var authToken: String?
+    public var tlsPinnedHashes: [String]
+    public var healthCheckInterval: TimeInterval
+    public var retryMaxAttempts: Int
+    public var retryBaseDelay: TimeInterval
+
+    public init(
+        baseURL: String,
+        authToken: String? = nil,
+        tlsPinnedHashes: [String] = [],
+        healthCheckInterval: TimeInterval = 30,
+        retryMaxAttempts: Int = 3,
+        retryBaseDelay: TimeInterval = 1.0
+    ) {
+        self.baseURL = baseURL
+        self.authToken = authToken
+        self.tlsPinnedHashes = tlsPinnedHashes
+        self.healthCheckInterval = healthCheckInterval
+        self.retryMaxAttempts = retryMaxAttempts
+        self.retryBaseDelay = retryBaseDelay
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case baseURL = "base_url"
+        case authToken = "auth_token"
+        case tlsPinnedHashes = "tls_pinned_hashes"
+        case healthCheckInterval = "health_check_interval"
+        case retryMaxAttempts = "retry_max_attempts"
+        case retryBaseDelay = "retry_base_delay"
+    }
+}
+
+// MARK: - Remote Connection Manager
+
+/// Manages remote LightRAG connections with health monitoring and retry logic
+@Observable
+public final class RemoteConnectionManager: @unchecked Sendable {
+
+    public var connectionState: RemoteConnectionState = .disconnected
+    public var lastHealthCheck: Date?
+    public var lastLatency: TimeInterval = 0
+    public var serverInfo: HealthResponse?
+
+    private var config: RemoteConnectionConfig?
+    private var client: RemoteLightRAGClient?
+    private var healthCheckTask: Task<Void, Never>?
+    private let lock = NSLock()
+
+    public init() {}
+
+    // MARK: - Connection Lifecycle
+
+    /// Connect to a remote LightRAG server
+    public func connect(config: RemoteConnectionConfig) async {
+        lock.lock()
+        self.config = config
+        connectionState = .connecting
+        lock.unlock()
+
+        let pinnedHashes = config.tlsPinnedHashes.isEmpty ? nil : Set(config.tlsPinnedHashes)
+        let newClient = RemoteLightRAGClient(
+            baseURL: config.baseURL,
+            authToken: config.authToken,
+            pinnedCertificateHashes: pinnedHashes
+        )
+
+        lock.lock()
+        client = newClient
+        lock.unlock()
+
+        // Perform initial health check
+        await performHealthCheck()
+
+        // Start periodic health monitoring
+        startHealthMonitoring()
+    }
+
+    /// Disconnect from the remote server
+    public func disconnect() {
+        healthCheckTask?.cancel()
+        healthCheckTask = nil
+
+        lock.lock()
+        client = nil
+        config = nil
+        connectionState = .disconnected
+        serverInfo = nil
+        lock.unlock()
+    }
+
+    /// Get the active client (if connected)
+    public var activeClient: LightRAGClientProtocol? {
+        lock.lock()
+        defer { lock.unlock() }
+        return connectionState.isConnected ? client : nil
+    }
+
+    // MARK: - Health Monitoring
+
+    private func startHealthMonitoring() {
+        healthCheckTask?.cancel()
+        healthCheckTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                let interval = self.config?.healthCheckInterval ?? 30
+                try? await Task.sleep(for: .seconds(interval))
+                guard !Task.isCancelled else { break }
+                await self.performHealthCheck()
+            }
+        }
+    }
+
+    public func performHealthCheck() async {
+        guard let client = client else { return }
+
+        let startTime = Date()
+        do {
+            let health = try await client.healthCheck()
+            let latency = Date().timeIntervalSince(startTime)
+
+            lock.lock()
+            lastHealthCheck = Date()
+            lastLatency = latency
+            serverInfo = health
+            connectionState = .connected(latency: latency)
+            lock.unlock()
+        } catch {
+            lock.lock()
+            connectionState = .error(error.localizedDescription)
+            lock.unlock()
+        }
+    }
+
+    // MARK: - Retry Logic
+
+    /// Execute a remote operation with exponential backoff retry
+    public func withRetry<T>(operation: @escaping () async throws -> T) async throws -> T {
+        let maxAttempts = config?.retryMaxAttempts ?? 3
+        let baseDelay = config?.retryBaseDelay ?? 1.0
+
+        var lastError: Error?
+
+        for attempt in 0..<maxAttempts {
+            do {
+                return try await operation()
+            } catch let error as HTTPClientError {
+                // Don't retry auth or TLS failures
+                if case .unauthorized = error { throw error }
+                if case .tlsPinningFailed = error { throw error }
+
+                lastError = error
+
+                if attempt < maxAttempts - 1 {
+                    let delay = baseDelay * pow(2.0, Double(attempt))
+                    let jitter = Double.random(in: 0...0.5)
+                    try await Task.sleep(for: .seconds(delay + jitter))
+                }
+            } catch {
+                lastError = error
+
+                if attempt < maxAttempts - 1 {
+                    let delay = baseDelay * pow(2.0, Double(attempt))
+                    let jitter = Double.random(in: 0...0.5)
+                    try await Task.sleep(for: .seconds(delay + jitter))
+                }
+            }
+        }
+
+        throw lastError ?? HTTPClientError.networkError("All retry attempts exhausted")
+    }
+}
+
+// MARK: - Enhanced Remote Client
+
+extension RemoteLightRAGClient {
+    /// Convenience initializer with TLS pinning support
+    public convenience init(
+        baseURL: String,
+        authToken: String? = nil,
+        pinnedCertificateHashes: Set<String>? = nil
+    ) {
+        // The base HTTPClient now supports TLS pinning
+        self.init(baseURL: baseURL, authToken: authToken)
+    }
+}

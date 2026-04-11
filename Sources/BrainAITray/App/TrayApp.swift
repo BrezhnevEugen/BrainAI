@@ -21,9 +21,12 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let systemMonitor = SystemMonitor()
     private let serviceOrchestrator: ServiceOrchestrator
+    private let remoteConnectionManager = RemoteConnectionManager()
     private var updateTimer: Timer?
     private var ollamaRunning = false
     private var lightRAGRunning = false
+    private var remoteLatency: TimeInterval = 0
+    private var remoteConnected = false
 
     override init() {
         let ollamaManager = OllamaProcessManager(port: UInt16(AppConfiguration.shared.ollamaPort))
@@ -73,6 +76,23 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
         let ollamaStatus = makeStatusItem(name: "Ollama", isRunning: ollamaRunning)
         menu.addItem(ollamaStatus)
+
+        // Remote connection status
+        if remoteConnected {
+            let latencyMs = Int(remoteLatency * 1000)
+            let remoteItem = makeStatusItem(name: "Remote", isRunning: true)
+            menu.addItem(remoteItem)
+
+            let latencyItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            let latencyColor: NSColor = latencyMs < 200 ? .systemGreen : (latencyMs < 500 ? .systemYellow : .systemRed)
+            latencyItem.attributedTitle = NSAttributedString(
+                string: "  Latency: \(latencyMs)ms",
+                attributes: [.font: font, .foregroundColor: latencyColor]
+            )
+            latencyItem.isEnabled = false
+            menu.addItem(latencyItem)
+        }
 
         menu.addItem(NSMenuItem.separator())
 
@@ -222,8 +242,15 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
             let lightragClient = LocalLightRAGClient()
             let health = try? await lightragClient.healthCheck()
+
+            // Check remote connection state
+            let remState = remoteConnectionManager.connectionState
+            let latency = remoteConnectionManager.lastLatency
+
             await MainActor.run {
                 lightRAGRunning = health != nil
+                remoteConnected = remState.isConnected
+                remoteLatency = latency
                 rebuildMenu()
             }
         }

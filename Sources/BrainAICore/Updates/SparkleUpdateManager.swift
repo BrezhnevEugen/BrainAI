@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Sparkle
 
 // MARK: - Sparkle Update Manager

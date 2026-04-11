@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import BrainAICore
 
 // MARK: - Knowledge Graph ViewModel

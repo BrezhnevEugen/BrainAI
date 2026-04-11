@@ -764,3 +764,419 @@ final class GraphDTOTests: XCTestCase {
         XCTAssertEqual(original.sourceId, decoded.sourceId)
     }
 }
+
+// MARK: - Remote Connection Tests
+
+final class RemoteConnectionTests: XCTestCase {
+
+    func testRemoteConnectionStateDisplayString() {
+        let disconnected = RemoteConnectionState.disconnected
+        XCTAssertEqual(disconnected.displayString, "Disconnected")
+        XCTAssertFalse(disconnected.isConnected)
+
+        let connecting = RemoteConnectionState.connecting
+        XCTAssertEqual(connecting.displayString, "Connecting...")
+        XCTAssertFalse(connecting.isConnected)
+
+        let connected = RemoteConnectionState.connected(latency: 0.150)
+        XCTAssertEqual(connected.displayString, "Connected (150ms)")
+        XCTAssertTrue(connected.isConnected)
+
+        let error = RemoteConnectionState.error("timeout")
+        XCTAssertEqual(error.displayString, "Error: timeout")
+        XCTAssertFalse(error.isConnected)
+    }
+
+    func testRemoteConnectionConfigCodable() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let original = RemoteConnectionConfig(
+            baseURL: "https://lightrag.example.com",
+            authToken: "secret-token",
+            tlsPinnedHashes: ["abc123", "def456"],
+            healthCheckInterval: 60,
+            retryMaxAttempts: 5,
+            retryBaseDelay: 2.0
+        )
+
+        let data = try encoder.encode(original)
+
+        // Verify snake_case from CodingKeys
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            XCTAssertNotNil(json["base_url"])
+            XCTAssertNotNil(json["auth_token"])
+            XCTAssertNotNil(json["tls_pinned_hashes"])
+            XCTAssertNotNil(json["health_check_interval"])
+            XCTAssertNotNil(json["retry_max_attempts"])
+            XCTAssertNotNil(json["retry_base_delay"])
+        }
+
+        let decoded = try decoder.decode(RemoteConnectionConfig.self, from: data)
+        XCTAssertEqual(decoded.baseURL, "https://lightrag.example.com")
+        XCTAssertEqual(decoded.authToken, "secret-token")
+        XCTAssertEqual(decoded.tlsPinnedHashes, ["abc123", "def456"])
+        XCTAssertEqual(decoded.healthCheckInterval, 60)
+        XCTAssertEqual(decoded.retryMaxAttempts, 5)
+        XCTAssertEqual(decoded.retryBaseDelay, 2.0)
+    }
+
+    func testRemoteConnectionConfigDefaults() {
+        let config = RemoteConnectionConfig(baseURL: "http://localhost:9621")
+
+        XCTAssertNil(config.authToken)
+        XCTAssertTrue(config.tlsPinnedHashes.isEmpty)
+        XCTAssertEqual(config.healthCheckInterval, 30)
+        XCTAssertEqual(config.retryMaxAttempts, 3)
+        XCTAssertEqual(config.retryBaseDelay, 1.0)
+    }
+
+    func testRemoteConnectionManagerInitialState() {
+        let manager = RemoteConnectionManager()
+
+        XCTAssertFalse(manager.connectionState.isConnected)
+        XCTAssertNil(manager.lastHealthCheck)
+        XCTAssertEqual(manager.lastLatency, 0)
+        XCTAssertNil(manager.serverInfo)
+        XCTAssertNil(manager.activeClient)
+    }
+
+    func testRemoteConnectionManagerDisconnect() {
+        let manager = RemoteConnectionManager()
+        manager.disconnect()
+
+        XCTAssertFalse(manager.connectionState.isConnected)
+        XCTAssertNil(manager.activeClient)
+        XCTAssertNil(manager.serverInfo)
+    }
+}
+
+// MARK: - MCP Protocol Tests
+
+final class MCPProtocolTests: XCTestCase {
+
+    func testMCPRequestEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let request = MCPRequest(
+            id: 1,
+            method: "tools/list"
+        )
+
+        let data = try encoder.encode(request)
+        let decoded = try decoder.decode(MCPRequest.self, from: data)
+
+        XCTAssertEqual(decoded.jsonrpc, "2.0")
+        XCTAssertEqual(decoded.id, 1)
+        XCTAssertEqual(decoded.method, "tools/list")
+        XCTAssertNil(decoded.params)
+    }
+
+    func testMCPRequestWithParams() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let request = MCPRequest(
+            id: 42,
+            method: "tools/call",
+            params: MCPParams(
+                name: "brainai_query",
+                arguments: [
+                    "question": .string("What is AI?"),
+                    "mode": .string("hybrid"),
+                    "top_k": .int(20)
+                ]
+            )
+        )
+
+        let data = try encoder.encode(request)
+        let decoded = try decoder.decode(MCPRequest.self, from: data)
+
+        XCTAssertEqual(decoded.id, 42)
+        XCTAssertEqual(decoded.method, "tools/call")
+        XCTAssertEqual(decoded.params?.name, "brainai_query")
+
+        if case .string(let q) = decoded.params?.arguments?["question"] {
+            XCTAssertEqual(q, "What is AI?")
+        } else {
+            XCTFail("Expected string argument for question")
+        }
+
+        if case .int(let k) = decoded.params?.arguments?["top_k"] {
+            XCTAssertEqual(k, 20)
+        } else {
+            XCTFail("Expected int argument for top_k")
+        }
+    }
+
+    func testMCPResponseSuccess() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let response = MCPResponse(
+            id: 1,
+            result: MCPResult(content: [
+                MCPContent(text: "Hello World")
+            ])
+        )
+
+        let data = try encoder.encode(response)
+        let decoded = try decoder.decode(MCPResponse.self, from: data)
+
+        XCTAssertEqual(decoded.jsonrpc, "2.0")
+        XCTAssertEqual(decoded.id, 1)
+        XCTAssertNil(decoded.error)
+        XCTAssertEqual(decoded.result?.content?.count, 1)
+        XCTAssertEqual(decoded.result?.content?.first?.type, "text")
+        XCTAssertEqual(decoded.result?.content?.first?.text, "Hello World")
+    }
+
+    func testMCPResponseError() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let response = MCPResponse(
+            id: 2,
+            error: MCPError(code: -32601, message: "Method not found")
+        )
+
+        let data = try encoder.encode(response)
+        let decoded = try decoder.decode(MCPResponse.self, from: data)
+
+        XCTAssertEqual(decoded.id, 2)
+        XCTAssertNil(decoded.result)
+        XCTAssertEqual(decoded.error?.code, -32601)
+        XCTAssertEqual(decoded.error?.message, "Method not found")
+    }
+
+    func testMCPToolDefinitionEncoding() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let tool = MCPToolDefinition(
+            name: "brainai_query",
+            description: "Query the knowledge base",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "question": MCPPropertySchema(type: "string", description: "The question"),
+                    "mode": MCPPropertySchema(type: "string", description: "Search mode", defaultValue: "hybrid")
+                ],
+                required: ["question"]
+            )
+        )
+
+        let data = try encoder.encode(tool)
+
+        // Verify input_schema key name from CodingKeys
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            XCTAssertNotNil(json["input_schema"])
+            XCTAssertNotNil(json["name"])
+            XCTAssertNotNil(json["description"])
+        }
+
+        let decoded = try decoder.decode(MCPToolDefinition.self, from: data)
+        XCTAssertEqual(decoded.name, "brainai_query")
+        XCTAssertEqual(decoded.inputSchema.type, "object")
+        XCTAssertEqual(decoded.inputSchema.properties?.count, 2)
+        XCTAssertEqual(decoded.inputSchema.required, ["question"])
+    }
+
+    func testMCPServerToolDefinitions() {
+        let tools = MCPServer.toolDefinitions
+
+        XCTAssertEqual(tools.count, 5)
+
+        let toolNames = tools.map(\.name)
+        XCTAssertTrue(toolNames.contains("brainai_query"))
+        XCTAssertTrue(toolNames.contains("brainai_insert"))
+        XCTAssertTrue(toolNames.contains("brainai_create_entity"))
+        XCTAssertTrue(toolNames.contains("brainai_create_relation"))
+        XCTAssertTrue(toolNames.contains("brainai_search"))
+
+        // Verify query tool has required "question" field
+        let queryTool = tools.first { $0.name == "brainai_query" }
+        XCTAssertEqual(queryTool?.inputSchema.required, ["question"])
+        XCTAssertNotNil(queryTool?.inputSchema.properties?["question"])
+        XCTAssertNotNil(queryTool?.inputSchema.properties?["mode"])
+        XCTAssertNotNil(queryTool?.inputSchema.properties?["top_k"])
+
+        // Verify insert tool has required "text" field
+        let insertTool = tools.first { $0.name == "brainai_insert" }
+        XCTAssertEqual(insertTool?.inputSchema.required, ["text"])
+
+        // Verify create_entity requires name and type
+        let entityTool = tools.first { $0.name == "brainai_create_entity" }
+        XCTAssertEqual(entityTool?.inputSchema.required?.sorted(), ["name", "type"])
+
+        // Verify create_relation requires source, target, description
+        let relationTool = tools.first { $0.name == "brainai_create_relation" }
+        XCTAssertEqual(relationTool?.inputSchema.required?.sorted(), ["description", "source", "target"])
+
+        // Verify search requires label
+        let searchTool = tools.first { $0.name == "brainai_search" }
+        XCTAssertEqual(searchTool?.inputSchema.required, ["label"])
+    }
+
+    func testMCPToolErrorDescriptions() {
+        let unknownTool = MCPToolError.unknownTool("foo")
+        XCTAssertEqual(unknownTool.errorDescription, "Unknown tool: foo")
+
+        let missingArg = MCPToolError.missingArgument("question")
+        XCTAssertEqual(missingArg.errorDescription, "Missing required argument: question")
+
+        let execFailed = MCPToolError.executionFailed("timeout")
+        XCTAssertEqual(execFailed.errorDescription, "Tool execution failed: timeout")
+    }
+
+    func testMCPPropertySchemaDefaultValue() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let schema = MCPPropertySchema(type: "string", description: "Search mode", defaultValue: "hybrid")
+        let data = try encoder.encode(schema)
+
+        // Verify "default" key from CodingKeys
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            XCTAssertEqual(json["default"] as? String, "hybrid")
+        }
+
+        let decoded = try decoder.decode(MCPPropertySchema.self, from: data)
+        XCTAssertEqual(decoded.type, "string")
+        XCTAssertEqual(decoded.description, "Search mode")
+        XCTAssertEqual(decoded.defaultValue, "hybrid")
+    }
+
+    func testAnyCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let values: [String: AnyCodable] = [
+            "string": .string("hello"),
+            "int": .int(42),
+            "double": .double(3.14),
+            "bool": .bool(true),
+            "null": .null,
+            "array": .array([.int(1), .string("two")]),
+            "object": .object(["nested": .bool(false)])
+        ]
+
+        let data = try encoder.encode(values)
+        let decoded = try decoder.decode([String: AnyCodable].self, from: data)
+
+        if case .string(let s) = decoded["string"] { XCTAssertEqual(s, "hello") }
+        else { XCTFail("Expected string") }
+
+        if case .int(let i) = decoded["int"] { XCTAssertEqual(i, 42) }
+        else { XCTFail("Expected int") }
+
+        if case .double(let d) = decoded["double"] { XCTAssertEqual(d, 3.14, accuracy: 0.001) }
+        else { XCTFail("Expected double") }
+
+        if case .bool(let b) = decoded["bool"] { XCTAssertTrue(b) }
+        else { XCTFail("Expected bool") }
+
+        if case .null = decoded["null"] { /* pass */ }
+        else { XCTFail("Expected null") }
+
+        if case .array(let arr) = decoded["array"] { XCTAssertEqual(arr.count, 2) }
+        else { XCTFail("Expected array") }
+
+        if case .object(let obj) = decoded["object"] { XCTAssertNotNil(obj["nested"]) }
+        else { XCTFail("Expected object") }
+    }
+}
+
+// MARK: - MCP Client Tests
+
+final class MCPClientTests: XCTestCase {
+
+    func testMCPClientErrorDescriptions() {
+        let notInit = MCPClientError.notInitialized
+        XCTAssertTrue(notInit.errorDescription?.contains("not initialized") ?? false)
+
+        let initFailed = MCPClientError.initializationFailed("bad response")
+        XCTAssertTrue(initFailed.errorDescription?.contains("bad response") ?? false)
+
+        let toolFailed = MCPClientError.toolCallFailed("brainai_query", "timeout")
+        XCTAssertTrue(toolFailed.errorDescription?.contains("brainai_query") ?? false)
+        XCTAssertTrue(toolFailed.errorDescription?.contains("timeout") ?? false)
+
+        let transport = MCPClientError.transportError("disconnected")
+        XCTAssertTrue(transport.errorDescription?.contains("disconnected") ?? false)
+
+        let timeout = MCPClientError.timeout
+        XCTAssertTrue(timeout.errorDescription?.contains("timed out") ?? false)
+    }
+
+    func testMCPServerInfoCodable() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        let info = MCPServerInfo(
+            protocolVersion: "2024-11-05",
+            serverInfo: MCPServerIdentity(name: "TestServer", version: "1.0.0"),
+            capabilities: MCPCapabilities(tools: [:])
+        )
+
+        let data = try encoder.encode(info)
+        let decoded = try decoder.decode(MCPServerInfo.self, from: data)
+
+        XCTAssertEqual(decoded.protocolVersion, "2024-11-05")
+        XCTAssertEqual(decoded.serverInfo?.name, "TestServer")
+        XCTAssertEqual(decoded.serverInfo?.version, "1.0.0")
+        XCTAssertNotNil(decoded.capabilities?.tools)
+    }
+
+    func testMCPToolCallResult() {
+        let result = MCPToolCallResult(
+            toolName: "brainai_query",
+            content: ["Line 1", "Line 2"],
+            isError: false
+        )
+
+        XCTAssertEqual(result.toolName, "brainai_query")
+        XCTAssertEqual(result.content.count, 2)
+        XCTAssertEqual(result.text, "Line 1\nLine 2")
+        XCTAssertFalse(result.isError)
+    }
+
+    func testMCPConnectionInfo() {
+        let info = MCPConnectionInfo(
+            id: "test-1",
+            name: "Test Server",
+            serverName: "Remote Server",
+            serverVersion: "2.0",
+            toolCount: 5,
+            status: .connected
+        )
+
+        XCTAssertEqual(info.id, "test-1")
+        XCTAssertEqual(info.name, "Test Server")
+        XCTAssertEqual(info.serverName, "Remote Server")
+        XCTAssertEqual(info.serverVersion, "2.0")
+        XCTAssertEqual(info.toolCount, 5)
+
+        if case .connected = info.status { /* pass */ }
+        else { XCTFail("Expected connected status") }
+    }
+
+    func testMCPClientManagerInitialState() {
+        let manager = MCPClientManager()
+        XCTAssertTrue(manager.connections.isEmpty)
+    }
+}
+
+// MARK: - HTTP Client Error Tests
+
+final class HTTPClientErrorTests: XCTestCase {
+
+    func testErrorDescriptions() {
+        XCTAssertEqual(HTTPClientError.invalidURL.errorDescription, "Invalid URL format")
+        XCTAssertTrue(HTTPClientError.requestFailed(statusCode: 404, data: nil).errorDescription?.contains("404") ?? false)
+        XCTAssertTrue(HTTPClientError.decodingFailed("bad json").errorDescription?.contains("bad json") ?? false)
+        XCTAssertTrue(HTTPClientError.networkError("no internet").errorDescription?.contains("no internet") ?? false)
+        XCTAssertEqual(HTTPClientError.unauthorized.errorDescription, "Authentication failed (401 Unauthorized)")
+        XCTAssertTrue(HTTPClientError.tlsPinningFailed.errorDescription?.contains("TLS") ?? false)
+    }
+}
