@@ -8,3 +8,6 @@
 
 # macOS
 .DS_Store
+
+# Local / optional spec copy (canonical spec may live elsewhere)
+TECHNICAL_SPEC.md
