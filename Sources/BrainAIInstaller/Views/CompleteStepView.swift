@@ -13,18 +13,18 @@ struct CompleteStepView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(viewModel.allComponentsHealthy ? .green : .yellow)
 
-            Text(viewModel.allComponentsHealthy ? "Installation Complete" : "Installation Finished")
+            Text(viewModel.allComponentsHealthy ? InstallerL10n.Complete.titleOk : InstallerL10n.Complete.titleWarn)
                 .font(.title)
                 .fontWeight(.bold)
 
             if viewModel.allComponentsHealthy {
-                Text("All components are installed and running. BrainAI is ready to use.")
+                Text(InstallerL10n.Complete.bodyOk)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 400)
             } else {
-                Text("Installation completed, but some components may need attention.\nYou can configure them in Settings.")
+                Text(InstallerL10n.Complete.bodyWarn)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -33,10 +33,10 @@ struct CompleteStepView: View {
 
             // Health status
             VStack(spacing: 8) {
-                statusRow(icon: "app.badge.checkmark", title: "BrainAI Core", healthy: true)
-                statusRow(icon: "server.rack", title: "LightRAG Server", healthy: viewModel.allComponentsHealthy)
+                statusRow(icon: "app.badge.checkmark", title: InstallerL10n.Complete.coreLabel, healthy: true)
+                statusRow(icon: "server.rack", title: InstallerL10n.Complete.lightragLabel, healthy: viewModel.allComponentsHealthy)
                 if viewModel.installOllama || viewModel.ollamaInstalled {
-                    statusRow(icon: "cpu", title: "Ollama", healthy: viewModel.ollamaInstalled || viewModel.allComponentsHealthy)
+                    statusRow(icon: "cpu", title: InstallerL10n.Complete.ollamaLabel, healthy: viewModel.ollamaInstalled || viewModel.allComponentsHealthy)
                 }
             }
             .padding(16)
@@ -45,7 +45,7 @@ struct CompleteStepView: View {
 
             // Launch at login toggle
             Toggle(isOn: $viewModel.launchAtLogin) {
-                Text("Launch BrainAI at login")
+                Text(InstallerL10n.Complete.launchLogin)
                     .font(.callout)
             }
             .toggleStyle(.checkbox)
@@ -55,11 +55,11 @@ struct CompleteStepView: View {
 
             // Action buttons
             HStack(spacing: 12) {
-                Button("Open Settings") {
+                Button(InstallerL10n.Nav.openSettings) {
                     NSWorkspace.shared.open(URL(string: "brainai://settings")!)
                 }
 
-                Button("Open BrainAI") {
+                Button(InstallerL10n.Nav.openBrainAI) {
                     NSWorkspace.shared.open(URL(string: "brainai://open")!)
                 }
                 .buttonStyle(.borderedProminent)

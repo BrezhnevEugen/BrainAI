@@ -1,0 +1,134 @@
+/* Installer — steps */
+"installer.step.welcome" = "Ласкаво просимо";
+"installer.step.components" = "Компоненти";
+"installer.step.provider" = "Провайдер";
+"installer.step.models" = "Моделі";
+"installer.step.install" = "Встановлення";
+"installer.step.complete" = "Готово";
+
+/* Navigation */
+"installer.nav.back" = "Назад";
+"installer.nav.continue" = "Далі";
+"installer.nav.done" = "Готово";
+"installer.nav.open_brainai" = "Відкрити BrainAI";
+"installer.nav.open_settings" = "Відкрити налаштування";
+
+/* Welcome */
+"installer.welcome.title" = "Ласкаво просимо до BrainAI";
+"installer.welcome.subtitle" = "Ваша персональна база знань з підтримкою ШІ.\nМайстер допоможе завершити встановлення.";
+"installer.welcome.item.lightrag.title" = "Сервер LightRAG";
+"installer.welcome.item.lightrag.desc" = "Граф знань і векторний пошук";
+"installer.welcome.item.ollama.title" = "Ollama";
+"installer.welcome.item.ollama.desc" = "Локальне середовище для LLM";
+"installer.welcome.item.models.title" = "Мовні моделі";
+"installer.welcome.item.models.desc" = "Моделі для чату та ембеддингів";
+"installer.welcome.macos" = "macOS %@";
+"installer.welcome.ram_gb" = "%llu ГБ ОЗП";
+
+/* Components */
+"installer.components.title" = "Вибір компонентів";
+"installer.components.subtitle" = "Оберіть, що встановити. BrainAI Core завжди включено.";
+"installer.components.core.title" = "BrainAI Core";
+"installer.components.core.desc" = "Основна програма, агент у меню та налаштування";
+"installer.components.lightrag.title" = "Сервер LightRAG";
+"installer.components.lightrag.desc" = "Граф знань на Python із підтримкою RAG";
+"installer.components.ollama.title" = "Середовище Ollama";
+"installer.components.ollama.desc" = "Локальний рушій для запуску LLM";
+"installer.components.sample.title" = "Демо база знань";
+"installer.components.sample.desc" = "Приклад даних для ознайомлення з BrainAI";
+"installer.components.estimated_prefix" = "Орієнтовно потрібно місця на диску:";
+"installer.components.detected_label" = "Виявлено в системі:";
+"installer.components.required" = "Обов’язково";
+"installer.components.ollama_installed" = "Уже встановлено";
+"installer.components.size.core" = "50 МБ";
+"installer.components.size.lightrag" = "~200 МБ";
+"installer.components.size.ollama" = "~150 МБ";
+"installer.components.size.sample" = "~10 МБ";
+"installer.components.badge.python" = "Python 3";
+"installer.components.badge.ollama" = "Ollama";
+"installer.components.badge.homebrew" = "Homebrew";
+
+/* Provider */
+"installer.provider.title" = "Налаштування провайдера ШІ";
+"installer.provider.subtitle" = "Оберіть основного провайдера. Пізніше це можна змінити в налаштуваннях.";
+"installer.provider.choice.ollama" = "Ollama (локально)";
+"installer.provider.choice.openai" = "OpenAI API";
+"installer.provider.choice.anthropic" = "Anthropic API";
+"installer.provider.choice.skip" = "Пропустити (налаштувати пізніше)";
+"installer.provider.desc.ollama" = "Запуск моделей локально на Mac. Приватно та без мережі.";
+"installer.provider.desc.openai" = "GPT‑4 та інші моделі через хмарний API.";
+"installer.provider.desc.anthropic" = "Моделі Claude через хмарний API.";
+"installer.provider.desc.skip" = "Налаштувати провайдера пізніше в застосунку.";
+"installer.provider.openai_key" = "Ключ OpenAI API";
+"installer.provider.anthropic_key" = "Ключ Anthropic API";
+"installer.provider.get_api_key" = "Отримати ключ";
+"installer.provider.keychain_note" = "Ключ API зберігається в зв’язці ключів macOS.";
+"installer.provider.placeholder.openai" = "sk-...";
+"installer.provider.placeholder.anthropic" = "sk-ant-...";
+
+/* Models */
+"installer.models.title" = "Вибір моделі";
+"installer.models.ram_hint" = "Оберіть модель з урахуванням доступної ОЗП (виявлено %llu ГБ).";
+"installer.models.scanning" = "Сканування встановлених моделей Ollama…";
+"installer.models.scan_hint" = "Встановлені моделі визначаються через Ollama і не входять у обсяг завантаження та кроки встановлення.";
+"installer.models.language_section" = "Мовна модель";
+"installer.models.recommended" = "Рекомендовано";
+"installer.models.installed" = "Встановлено";
+"installer.models.size_line" = "Розмір: %@";
+"installer.models.no_download" = "Уже в Ollama — завантаження не потрібне";
+"installer.models.requires_ram" = "Потрібно: %@ ОЗП";
+"installer.models.embedding.sub.installed" = "Уже встановлено в Ollama — завантаження не потрібне.";
+"installer.models.embedding.sub.pending" = "Модель ембеддингів для векторного пошуку (~300 МБ)";
+"installer.models.approx_download" = "Приблизний обсяг завантаження (лише pip / brew / ollama pull):";
+"installer.models.app_note" = "Застосунок BrainAI тут не завантажується — він уже на образі диска. Наступний крок запускає команди в терміналі для перелічених пунктів.";
+"installer.models.planned_steps" = "Заплановані кроки";
+"installer.models.nothing_to_run" = "Нічого запускати — усе необхідне вже є.";
+"installer.models.qwen_7b" = "Qwen 2.5 7B";
+"installer.models.qwen_14b" = "Qwen 2.5 14B";
+"installer.models.qwen_32b" = "Qwen 2.5 32B";
+"installer.models.size.45gb" = "~4,5 ГБ";
+"installer.models.size.9gb" = "~9 ГБ";
+"installer.models.size.20gb" = "~20 ГБ";
+"installer.models.ram.8gb" = "8 ГБ";
+"installer.models.ram.16gb" = "16 ГБ";
+"installer.models.ram.32gb" = "32 ГБ";
+
+/* Download */
+"installer.download.title" = "Встановлення компонентів";
+"installer.download.waiting" = "Зачекайте, виконується встановлення…";
+"installer.download.success" = "Усі компоненти успішно встановлено.";
+"installer.download.step" = "Крок %d з %d";
+"installer.download.status.waiting" = "Очікування…";
+"installer.download.status.completed" = "Готово";
+"installer.download.retry" = "Повторити";
+
+/* Install tasks */
+"installer.task.python.name" = "Середовище Python";
+"installer.task.python.desc" = "Перевірка наявності Python 3";
+"installer.task.lightrag.name" = "Сервер LightRAG";
+"installer.task.lightrag.desc" = "Встановлення LightRAG і залежностей";
+"installer.task.ollama.name" = "Ollama";
+"installer.task.ollama.desc" = "Встановлення середовища Ollama";
+"installer.task.llm.name" = "Мовна модель (%@)";
+"installer.task.llm.desc" = "Завантаження мовної моделі";
+"installer.task.embed.name" = "Модель ембеддингів";
+"installer.task.embed.desc" = "Завантаження nomic-embed-text";
+"installer.task.sample.name" = "Демо база знань";
+"installer.task.sample.desc" = "Завантаження демо-даних";
+
+/* Complete */
+"installer.complete.title.ok" = "Встановлення завершено";
+"installer.complete.title.warn" = "Встановлення закінчено";
+"installer.complete.body.ok" = "Компоненти встановлено та працюють. BrainAI готовий до використання.";
+"installer.complete.body.warn" = "Встановлення завершено, але частина компонентів може потребувати уваги.\nНалаштуйте їх у розділі «Налаштування».";
+"installer.complete.launch_login" = "Запускати BrainAI під час входу";
+"installer.complete.core" = "BrainAI Core";
+"installer.complete.lightrag" = "Сервер LightRAG";
+"installer.complete.ollama" = "Ollama";
+
+/* Errors */
+"installer.error.homebrew_ollama" = "Homebrew не знайдено. Встановіть Ollama вручну з сайту ollama.com";
+
+/* Disk estimate */
+"installer.diskspace.gb" = "%.1f ГБ";
+"installer.diskspace.mb" = "%d МБ";

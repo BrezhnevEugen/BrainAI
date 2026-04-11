@@ -1,0 +1,134 @@
+/* Installer — steps */
+"installer.step.welcome" = "Welcome";
+"installer.step.components" = "Components";
+"installer.step.provider" = "Provider";
+"installer.step.models" = "Models";
+"installer.step.install" = "Install";
+"installer.step.complete" = "Complete";
+
+/* Navigation */
+"installer.nav.back" = "Back";
+"installer.nav.continue" = "Continue";
+"installer.nav.done" = "Done";
+"installer.nav.open_brainai" = "Open BrainAI";
+"installer.nav.open_settings" = "Open Settings";
+
+/* Welcome */
+"installer.welcome.title" = "Welcome to BrainAI";
+"installer.welcome.subtitle" = "Your personal knowledge base with AI augmentation.\nThis wizard will guide you through the installation process.";
+"installer.welcome.item.lightrag.title" = "LightRAG Server";
+"installer.welcome.item.lightrag.desc" = "Knowledge graph engine with vector search";
+"installer.welcome.item.ollama.title" = "Ollama";
+"installer.welcome.item.ollama.desc" = "Local LLM runtime for private AI";
+"installer.welcome.item.models.title" = "Language Models";
+"installer.welcome.item.models.desc" = "AI models for chat and embeddings";
+"installer.welcome.macos" = "macOS %@";
+"installer.welcome.ram_gb" = "%llu GB RAM";
+
+/* Components */
+"installer.components.title" = "Select Components";
+"installer.components.subtitle" = "Choose which components to install. BrainAI Core is always included.";
+"installer.components.core.title" = "BrainAI Core";
+"installer.components.core.desc" = "Main application, tray agent, and settings";
+"installer.components.lightrag.title" = "LightRAG Server";
+"installer.components.lightrag.desc" = "Python-based knowledge graph engine with RAG support";
+"installer.components.ollama.title" = "Ollama Runtime";
+"installer.components.ollama.desc" = "Local LLM inference engine for private AI processing";
+"installer.components.sample.title" = "Sample Knowledge Base";
+"installer.components.sample.desc" = "Demo data to explore BrainAI features";
+"installer.components.estimated_prefix" = "Estimated disk space required:";
+"installer.components.detected_label" = "Detected on your system:";
+"installer.components.required" = "Required";
+"installer.components.ollama_installed" = "Already installed";
+"installer.components.size.core" = "50 MB";
+"installer.components.size.lightrag" = "~200 MB";
+"installer.components.size.ollama" = "~150 MB";
+"installer.components.size.sample" = "~10 MB";
+"installer.components.badge.python" = "Python 3";
+"installer.components.badge.ollama" = "Ollama";
+"installer.components.badge.homebrew" = "Homebrew";
+
+/* Provider */
+"installer.provider.title" = "AI Provider Setup";
+"installer.provider.subtitle" = "Choose your primary AI provider. You can change this later in Settings.";
+"installer.provider.choice.ollama" = "Ollama (Local)";
+"installer.provider.choice.openai" = "OpenAI API";
+"installer.provider.choice.anthropic" = "Anthropic API";
+"installer.provider.choice.skip" = "Skip (Configure Later)";
+"installer.provider.desc.ollama" = "Run AI models locally on your Mac. Private and offline.";
+"installer.provider.desc.openai" = "Use GPT-4 and other models via cloud API.";
+"installer.provider.desc.anthropic" = "Use Claude models via cloud API.";
+"installer.provider.desc.skip" = "Configure AI provider later in application settings.";
+"installer.provider.openai_key" = "OpenAI API Key";
+"installer.provider.anthropic_key" = "Anthropic API Key";
+"installer.provider.get_api_key" = "Get API Key";
+"installer.provider.keychain_note" = "Your API key is stored securely in the macOS Keychain.";
+"installer.provider.placeholder.openai" = "sk-...";
+"installer.provider.placeholder.anthropic" = "sk-ant-...";
+
+/* Models */
+"installer.models.title" = "Model Selection";
+"installer.models.ram_hint" = "Choose a language model based on your available RAM (%llu GB detected).";
+"installer.models.scanning" = "Scanning Ollama for installed models…";
+"installer.models.scan_hint" = "Installed models are detected via Ollama and excluded from download size and install steps.";
+"installer.models.language_section" = "Language Model";
+"installer.models.recommended" = "Recommended";
+"installer.models.installed" = "Installed";
+"installer.models.size_line" = "Size: %@";
+"installer.models.no_download" = "Already in Ollama — no download";
+"installer.models.requires_ram" = "Requires: %@ RAM";
+"installer.models.embedding.sub.installed" = "Already installed in Ollama — no download needed.";
+"installer.models.embedding.sub.pending" = "Embedding model for vector search (~300 MB)";
+"installer.models.approx_download" = "Approx. download (pip / brew / Ollama pulls only):";
+"installer.models.app_note" = "The BrainAI app is not downloaded here — it is already on this disk image. The next step only runs shell commands for the items below.";
+"installer.models.planned_steps" = "Planned install steps";
+"installer.models.nothing_to_run" = "Nothing to run — everything we check for is already present.";
+"installer.models.qwen_7b" = "Qwen 2.5 7B";
+"installer.models.qwen_14b" = "Qwen 2.5 14B";
+"installer.models.qwen_32b" = "Qwen 2.5 32B";
+"installer.models.size.45gb" = "~4.5 GB";
+"installer.models.size.9gb" = "~9 GB";
+"installer.models.size.20gb" = "~20 GB";
+"installer.models.ram.8gb" = "8 GB";
+"installer.models.ram.16gb" = "16 GB";
+"installer.models.ram.32gb" = "32 GB";
+
+/* Download */
+"installer.download.title" = "Installing Components";
+"installer.download.waiting" = "Please wait while components are being installed...";
+"installer.download.success" = "All components installed successfully.";
+"installer.download.step" = "Step %d of %d";
+"installer.download.status.waiting" = "Waiting...";
+"installer.download.status.completed" = "Completed";
+"installer.download.retry" = "Retry";
+
+/* Install tasks (names shown in list) */
+"installer.task.python.name" = "Python Environment";
+"installer.task.python.desc" = "Checking Python 3 availability";
+"installer.task.lightrag.name" = "LightRAG Server";
+"installer.task.lightrag.desc" = "Installing LightRAG and dependencies";
+"installer.task.ollama.name" = "Ollama";
+"installer.task.ollama.desc" = "Installing Ollama runtime";
+"installer.task.llm.name" = "LLM Model (%@)";
+"installer.task.llm.desc" = "Downloading language model";
+"installer.task.embed.name" = "Embedding Model";
+"installer.task.embed.desc" = "Downloading nomic-embed-text";
+"installer.task.sample.name" = "Sample Knowledge Base";
+"installer.task.sample.desc" = "Loading demo data";
+
+/* Complete */
+"installer.complete.title.ok" = "Installation Complete";
+"installer.complete.title.warn" = "Installation Finished";
+"installer.complete.body.ok" = "All components are installed and running. BrainAI is ready to use.";
+"installer.complete.body.warn" = "Installation completed, but some components may need attention.\nYou can configure them in Settings.";
+"installer.complete.launch_login" = "Launch BrainAI at login";
+"installer.complete.core" = "BrainAI Core";
+"installer.complete.lightrag" = "LightRAG Server";
+"installer.complete.ollama" = "Ollama";
+
+/* Errors */
+"installer.error.homebrew_ollama" = "Homebrew not found. Please install Ollama manually from ollama.com";
+
+/* Disk estimate */
+"installer.diskspace.gb" = "%.1f GB";
+"installer.diskspace.mb" = "%d MB";

@@ -6,46 +6,46 @@ struct ComponentsStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Select Components")
+            Text(InstallerL10n.Components.title)
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Choose which components to install. BrainAI Core is always included.")
+            Text(InstallerL10n.Components.subtitle)
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 12) {
                 componentRow(
                     icon: "app.badge.checkmark",
-                    title: "BrainAI Core",
-                    description: "Main application, tray agent, and settings",
-                    size: "50 MB",
+                    title: InstallerL10n.Components.coreTitle,
+                    description: InstallerL10n.Components.coreDesc,
+                    size: InstallerL10n.Components.sizeCore,
                     isOn: .constant(true),
                     isRequired: true
                 )
 
                 componentRow(
                     icon: "server.rack",
-                    title: "LightRAG Server",
-                    description: "Python-based knowledge graph engine with RAG support",
-                    size: "~200 MB",
+                    title: InstallerL10n.Components.lightragTitle,
+                    description: InstallerL10n.Components.lightragDesc,
+                    size: InstallerL10n.Components.sizeLightrag,
                     isOn: $viewModel.installLightRAG
                 )
 
                 componentRow(
                     icon: "cpu",
-                    title: "Ollama Runtime",
-                    description: "Local LLM inference engine for private AI processing",
-                    size: "~150 MB",
+                    title: InstallerL10n.Components.ollamaTitle,
+                    description: InstallerL10n.Components.ollamaDesc,
+                    size: InstallerL10n.Components.sizeOllama,
                     isOn: $viewModel.installOllama,
-                    detectedNote: viewModel.ollamaInstalled ? "Already installed" : nil
+                    detectedNote: viewModel.ollamaInstalled ? InstallerL10n.Components.ollamaInstalled : nil
                 )
 
                 componentRow(
                     icon: "book",
-                    title: "Sample Knowledge Base",
-                    description: "Demo data to explore BrainAI features",
-                    size: "~10 MB",
+                    title: InstallerL10n.Components.sampleTitle,
+                    description: InstallerL10n.Components.sampleDesc,
+                    size: InstallerL10n.Components.sizeSample,
                     isOn: $viewModel.installSampleData
                 )
             }
@@ -56,7 +56,7 @@ struct ComponentsStepView: View {
             HStack {
                 Image(systemName: "internaldrive")
                     .foregroundStyle(.secondary)
-                Text("Estimated disk space required: ")
+                Text(InstallerL10n.Components.estimatedPrefix + " ")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Text(viewModel.estimatedDiskSpace)
@@ -70,13 +70,13 @@ struct ComponentsStepView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .foregroundStyle(.green)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Detected on your system:")
+                        Text(InstallerL10n.Components.detectedLabel)
                             .font(.caption)
                             .fontWeight(.medium)
                         HStack(spacing: 8) {
-                            if viewModel.pythonInstalled { detectedBadge("Python 3") }
-                            if viewModel.ollamaInstalled { detectedBadge("Ollama") }
-                            if viewModel.homebrewInstalled { detectedBadge("Homebrew") }
+                            if viewModel.pythonInstalled { detectedBadge(InstallerL10n.Components.badgePython) }
+                            if viewModel.ollamaInstalled { detectedBadge(InstallerL10n.Components.badgeOllama) }
+                            if viewModel.homebrewInstalled { detectedBadge(InstallerL10n.Components.badgeHomebrew) }
                         }
                     }
                 }
@@ -110,7 +110,7 @@ struct ComponentsStepView: View {
                         .font(.callout)
                         .fontWeight(.medium)
                     if isRequired {
-                        Text("Required")
+                        Text(InstallerL10n.Components.required)
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)

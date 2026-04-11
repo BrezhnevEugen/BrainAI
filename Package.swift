@@ -73,7 +73,10 @@ let package = Package(
         .executableTarget(
             name: "BrainAIInstaller",
             dependencies: ["BrainAICore"],
-            path: "Sources/BrainAIInstaller"
+            path: "Sources/BrainAIInstaller",
+            resources: [
+                .process("Resources"),
+            ]
         ),
 
         // MARK: - Tests

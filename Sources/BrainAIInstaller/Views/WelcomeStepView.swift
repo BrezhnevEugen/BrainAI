@@ -6,18 +6,18 @@ struct WelcomeStepView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Spacer()
-
+            // Avoid Spacer() here: in a fixed-height installer window it steals space and can
+            // squeeze the shared navigation bar (Continue) out of view.
             // Logo / Icon
             Image(systemName: "brain.head.profile")
                 .font(.system(size: 64))
                 .foregroundStyle(Color.accentColor)
 
-            Text("Welcome to BrainAI")
+            Text(InstallerL10n.Welcome.title)
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Your personal knowledge base with AI augmentation.\nThis wizard will guide you through the installation process.")
+            Text(InstallerL10n.Welcome.subtitle)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -25,9 +25,9 @@ struct WelcomeStepView: View {
 
             // What will be installed
             VStack(alignment: .leading, spacing: 8) {
-                installItem(icon: "server.rack", title: "LightRAG Server", description: "Knowledge graph engine with vector search")
-                installItem(icon: "cpu", title: "Ollama", description: "Local LLM runtime for private AI")
-                installItem(icon: "brain", title: "Language Models", description: "AI models for chat and embeddings")
+                installItem(icon: "server.rack", title: InstallerL10n.Welcome.itemLightRAGTitle, description: InstallerL10n.Welcome.itemLightRAGDesc)
+                installItem(icon: "cpu", title: InstallerL10n.Welcome.itemOllamaTitle, description: InstallerL10n.Welcome.itemOllamaDesc)
+                installItem(icon: "brain", title: InstallerL10n.Welcome.itemModelsTitle, description: InstallerL10n.Welcome.itemModelsDesc)
             }
             .padding(20)
             .background(Color(nsColor: .quaternaryLabelColor).opacity(0.3))
@@ -35,17 +35,17 @@ struct WelcomeStepView: View {
 
             // System info
             HStack(spacing: 16) {
-                Label("macOS \(ProcessInfo.processInfo.operatingSystemVersionString)", systemImage: "desktopcomputer")
+                Label(InstallerL10n.Welcome.macOSVersion(ProcessInfo.processInfo.operatingSystemVersionString), systemImage: "desktopcomputer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Label("\(viewModel.systemRAM) GB RAM", systemImage: "memorychip")
+                Label(InstallerL10n.Welcome.ramGB(viewModel.systemRAM), systemImage: "memorychip")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
 
     private func installItem(icon: String, title: String, description: String) -> some View {

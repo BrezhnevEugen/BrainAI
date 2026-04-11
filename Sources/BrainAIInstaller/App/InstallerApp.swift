@@ -15,12 +15,12 @@ enum InstallerStep: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .welcome: "Welcome"
-        case .components: "Components"
-        case .provider: "Provider"
-        case .models: "Models"
-        case .download: "Install"
-        case .complete: "Complete"
+        case .welcome: InstallerL10n.Step.welcome
+        case .components: InstallerL10n.Step.components
+        case .provider: InstallerL10n.Step.provider
+        case .models: InstallerL10n.Step.models
+        case .download: InstallerL10n.Step.install
+        case .complete: InstallerL10n.Step.complete
         }
     }
 }
@@ -47,6 +47,29 @@ final class InstallerViewModel: @unchecked Sendable {
     var selectedLLMModel = "qwen2.5:7b"
     var installEmbeddingModel = true
     var systemRAM: UInt64 = 0
+
+    /// Canonical Ollama names from `ollama list` (see `OllamaModelInventory`).
+    private var installedOllamaModelCanonicalNames = Set<String>()
+    var isScanningOllamaModels = false
+
+    /// Scans `ollama list` (JSON or text) on a background thread; updates `installedOllamaModelCanonicalNames`.
+    func scanInstalledOllamaModels() async {
+        await MainActor.run { isScanningOllamaModels = true }
+        let names = await OllamaModelInventory.fetchInstalledCanonicalNames()
+        await MainActor.run {
+            lock.lock()
+            installedOllamaModelCanonicalNames = names
+            lock.unlock()
+            isScanningOllamaModels = false
+        }
+    }
+
+    func isOllamaModelInstalled(_ modelId: String) -> Bool {
+        let canonical = OllamaModelInventory.canonicalName(modelId)
+        lock.lock()
+        defer { lock.unlock() }
+        return installedOllamaModelCanonicalNames.contains(canonical)
+    }
 
     // Download state
     var downloadTasks: [DownloadTask] = []
@@ -88,23 +111,42 @@ final class InstallerViewModel: @unchecked Sendable {
         return "qwen2.5:7b"
     }
 
+    /// Rough size for **third‑party** pieces this wizard installs (pip, brew, `ollama pull`).
+    /// The BrainAI `.app` bundle is not downloaded by these steps — it comes from the disk image.
     var estimatedDiskSpace: String {
         var totalMB: Int = 0
-        totalMB += 50 // BrainAI Core
         if installLightRAG { totalMB += 200 }
         if installOllama { totalMB += 150 }
         if selectedProvider == .ollama {
-            if selectedLLMModel.contains("32b") { totalMB += 20_000 }
-            else if selectedLLMModel.contains("14b") { totalMB += 9_000 }
-            else { totalMB += 4_500 }
-            if installEmbeddingModel { totalMB += 300 }
+            if !isOllamaModelInstalled(selectedLLMModel) {
+                if selectedLLMModel.contains("32b") { totalMB += 20_000 }
+                else if selectedLLMModel.contains("14b") { totalMB += 9_000 }
+                else { totalMB += 4_500 }
+            }
+            if installEmbeddingModel, !isOllamaModelInstalled("nomic-embed-text") {
+                totalMB += 300
+            }
         }
         if installSampleData { totalMB += 10 }
 
         if totalMB >= 1024 {
-            return String(format: "%.1f GB", Double(totalMB) / 1024.0)
+            return InstallerL10n.DiskSpace.gigabytes(Double(totalMB) / 1024.0)
         }
-        return "\(totalMB) MB"
+        return InstallerL10n.DiskSpace.megabytes(totalMB)
+    }
+
+    /// Same logic as the install step task list, for UI preview on the Models screen.
+    var plannedInstallStepSummaries: [PlannedInstallStepSummary] {
+        lock.lock()
+        let snap = installedOllamaModelCanonicalNames
+        lock.unlock()
+        return buildDownloadTasks(installedOllama: snap).enumerated().map { index, task in
+            PlannedInstallStepSummary(
+                id: "\(index)-\(task.name)",
+                title: task.name,
+                subtitle: task.description
+            )
+        }
     }
 
     // MARK: - Navigation
@@ -181,44 +223,55 @@ final class InstallerViewModel: @unchecked Sendable {
         await runHealthChecks()
     }
 
-    private func buildDownloadTasks() -> [DownloadTask] {
+    private func buildDownloadTasks(installedOllama: Set<String>) -> [DownloadTask] {
+        func ollamaHas(_ modelId: String) -> Bool {
+            installedOllama.contains(OllamaModelInventory.canonicalName(modelId))
+        }
+
         var tasks: [DownloadTask] = []
 
         if installLightRAG && !pythonInstalled {
             tasks.append(DownloadTask(
-                name: "Python Environment",
-                description: "Checking Python 3 availability",
+                kind: .pythonEnvironment,
+                name: InstallerL10n.Task.pythonName,
+                description: InstallerL10n.Task.pythonDesc,
                 icon: "terminal"
             ))
         }
 
         if installLightRAG {
             tasks.append(DownloadTask(
-                name: "LightRAG Server",
-                description: "Installing LightRAG and dependencies",
+                kind: .lightragServer,
+                name: InstallerL10n.Task.lightragName,
+                description: InstallerL10n.Task.lightragDesc,
                 icon: "server.rack"
             ))
         }
 
         if installOllama && !ollamaInstalled {
             tasks.append(DownloadTask(
-                name: "Ollama",
-                description: "Installing Ollama runtime",
+                kind: .ollamaRuntime,
+                name: InstallerL10n.Task.ollamaName,
+                description: InstallerL10n.Task.ollamaDesc,
                 icon: "cpu"
             ))
         }
 
         if selectedProvider == .ollama {
-            tasks.append(DownloadTask(
-                name: "LLM Model (\(selectedLLMModel))",
-                description: "Downloading language model",
-                icon: "brain"
-            ))
-
-            if installEmbeddingModel {
+            if !ollamaHas(selectedLLMModel) {
                 tasks.append(DownloadTask(
-                    name: "Embedding Model",
-                    description: "Downloading nomic-embed-text",
+                    kind: .llmModel,
+                    name: InstallerL10n.Task.llmName(model: selectedLLMModel),
+                    description: InstallerL10n.Task.llmDesc,
+                    icon: "brain"
+                ))
+            }
+
+            if installEmbeddingModel, !ollamaHas("nomic-embed-text") {
+                tasks.append(DownloadTask(
+                    kind: .embeddingModel,
+                    name: InstallerL10n.Task.embedName,
+                    description: InstallerL10n.Task.embedDesc,
                     icon: "square.grid.3x3"
                 ))
             }
@@ -226,8 +279,9 @@ final class InstallerViewModel: @unchecked Sendable {
 
         if installSampleData {
             tasks.append(DownloadTask(
-                name: "Sample Knowledge Base",
-                description: "Loading demo data",
+                kind: .sampleKnowledgeBase,
+                name: InstallerL10n.Task.sampleName,
+                description: InstallerL10n.Task.sampleDesc,
                 icon: "book"
             ))
         }
@@ -236,27 +290,23 @@ final class InstallerViewModel: @unchecked Sendable {
     }
 
     private func executeTask(_ task: DownloadTask) async throws {
-        // Simulate installation with delays (real implementation would use Process)
-        switch task.name {
-        case let name where name.contains("Python"):
+        switch task.kind {
+        case .pythonEnvironment:
             try await runProcess("python3", arguments: ["--version"])
-        case let name where name.contains("LightRAG"):
+        case .lightragServer:
             try await runProcess("pip3", arguments: ["install", "--user", "lightrag-hku"])
-        case let name where name.contains("Ollama") && !name.contains("Model"):
+        case .ollamaRuntime:
             if homebrewInstalled {
                 try await runProcess("brew", arguments: ["install", "ollama"])
             } else {
-                throw InstallerError.componentNotAvailable("Homebrew not found. Please install Ollama manually from ollama.com")
+                throw InstallerError.componentNotAvailable(InstallerL10n.ErrorMessage.homebrewOllama)
             }
-        case let name where name.contains("LLM Model"):
+        case .llmModel:
             try await runProcess("ollama", arguments: ["pull", selectedLLMModel])
-        case let name where name.contains("Embedding"):
+        case .embeddingModel:
             try await runProcess("ollama", arguments: ["pull", "nomic-embed-text"])
-        case let name where name.contains("Sample"):
-            // Copy sample data
+        case .sampleKnowledgeBase:
             try await Task.sleep(for: .seconds(1))
-        default:
-            break
         }
     }
 
@@ -282,8 +332,9 @@ final class InstallerViewModel: @unchecked Sendable {
 
     private func beginInstallation() {
         lock.lock()
+        let installedSnap = installedOllamaModelCanonicalNames
         isDownloading = true
-        downloadTasks = buildDownloadTasks()
+        downloadTasks = buildDownloadTasks(installedOllama: installedSnap)
         currentTaskIndex = 0
         lock.unlock()
     }
@@ -374,16 +425,42 @@ final class InstallerViewModel: @unchecked Sendable {
 // MARK: - Supporting Types
 
 enum ProviderChoice: String, CaseIterable, Identifiable {
-    case ollama = "Ollama (Local)"
-    case openai = "OpenAI API"
-    case anthropic = "Anthropic API"
-    case skip = "Skip (Configure Later)"
+    case ollama
+    case openai
+    case anthropic
+    case skip
 
     var id: String { rawValue }
+
+    var localizedTitle: String {
+        switch self {
+        case .ollama: InstallerL10n.Provider.choiceOllama
+        case .openai: InstallerL10n.Provider.choiceOpenAI
+        case .anthropic: InstallerL10n.Provider.choiceAnthropic
+        case .skip: InstallerL10n.Provider.choiceSkip
+        }
+    }
+}
+
+/// One row in the “what will run” preview (Models step).
+struct PlannedInstallStepSummary: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let subtitle: String
+}
+
+enum InstallTaskKind: Equatable, Sendable {
+    case pythonEnvironment
+    case lightragServer
+    case ollamaRuntime
+    case llmModel
+    case embeddingModel
+    case sampleKnowledgeBase
 }
 
 struct DownloadTask: Identifiable {
     let id = UUID()
+    let kind: InstallTaskKind
     let name: String
     let description: String
     let icon: String
@@ -419,7 +496,8 @@ struct BrainAIInstallerApp: App {
     var body: some Scene {
         WindowGroup {
             InstallerContentView(viewModel: viewModel)
-                .frame(width: 700, height: 500)
+                .frame(minWidth: 700, minHeight: 560)
+                .frame(idealWidth: 720, idealHeight: 620)
         }
         .windowResizability(.contentSize)
     }
@@ -439,16 +517,20 @@ struct InstallerContentView: View {
 
             Divider()
 
-            // Step content
-            stepContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(24)
+            // Scroll so tall steps (e.g. Welcome) never push Continue/Back below the window.
+            ScrollView {
+                stepContent
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .padding(24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             Divider()
 
-            // Navigation buttons
+            // Navigation buttons (always visible above scroll area)
             navigationBar
                 .padding(16)
+                .layoutPriority(1)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
@@ -524,7 +606,7 @@ struct InstallerContentView: View {
     private var navigationBar: some View {
         HStack {
             if viewModel.currentStep != .welcome && viewModel.currentStep != .complete {
-                Button("Back") {
+                Button(InstallerL10n.Nav.back) {
                     viewModel.goBack()
                 }
             }
@@ -532,12 +614,12 @@ struct InstallerContentView: View {
             Spacer()
 
             if viewModel.currentStep == .complete {
-                Button("Open BrainAI") {
+                Button(InstallerL10n.Nav.openBrainAI) {
                     NSWorkspace.shared.open(URL(string: "brainai://open")!)
                 }
                 .buttonStyle(.borderedProminent)
             } else if viewModel.currentStep != .download || !viewModel.isDownloading {
-                Button(viewModel.currentStep == .download ? "Done" : "Continue") {
+                Button(viewModel.currentStep == .download ? InstallerL10n.Nav.done : InstallerL10n.Nav.continue) {
                     viewModel.advance()
                 }
                 .buttonStyle(.borderedProminent)

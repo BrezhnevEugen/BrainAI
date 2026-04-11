@@ -34,12 +34,18 @@ echo "==> Binaries: $BIN_DIR"
 
 SPARKLE_FW="$BIN_DIR/Sparkle.framework"
 RES_BUNDLE="$BIN_DIR/BrainAI_BrainAICore.bundle"
+# SwiftPM resource bundle for the installer target (Localizable.strings per locale).
+INSTALLER_RES_BUNDLE="$BIN_DIR/BrainAI_BrainAIInstaller.bundle"
 if [[ ! -d "$SPARKLE_FW" ]]; then
   echo "error: Sparkle.framework not found in $BIN_DIR (SwiftPM release output)." >&2
   exit 1
 fi
 if [[ ! -d "$RES_BUNDLE" ]]; then
   echo "error: BrainAI_BrainAICore.bundle not found in $BIN_DIR." >&2
+  exit 1
+fi
+if [[ ! -d "$INSTALLER_RES_BUNDLE" ]]; then
+  echo "error: BrainAI_BrainAIInstaller.bundle not found in $BIN_DIR (installer localization)." >&2
   exit 1
 fi
 
@@ -67,6 +73,15 @@ plist_set_bool() {
   fi
 }
 
+plist_set_localizations() {
+  local plist="$1"
+  if plutil -extract CFBundleLocalizations xml1 "$plist" >/dev/null 2>&1; then
+    plutil -replace CFBundleLocalizations -json '["en","ru","uk"]' "$plist"
+  else
+    plutil -insert CFBundleLocalizations -json '["en","ru","uk"]' "$plist"
+  fi
+}
+
 # Assemble one .app: executable name inside MacOS may differ from SPM product (e.g. BrainAI vs BrainAIApp).
 assemble_app() {
   local app_name="$1"
@@ -80,9 +95,14 @@ assemble_app() {
 
   cp "$src_macho" "$app_path/Contents/MacOS/$exec_in_macos"
   chmod +x "$app_path/Contents/MacOS/$exec_in_macos"
-  rm -rf "$app_path/Contents/MacOS/Sparkle.framework" "$app_path/Contents/MacOS/BrainAI_BrainAICore.bundle"
+  rm -rf "$app_path/Contents/MacOS/Sparkle.framework" "$app_path/Contents/MacOS/BrainAI_BrainAICore.bundle" \
+    "$app_path/Contents/MacOS/BrainAI_BrainAIInstaller.bundle"
   cp -R "$SPARKLE_FW" "$app_path/Contents/MacOS/"
   cp -R "$RES_BUNDLE" "$app_path/Contents/MacOS/"
+  # Installer strings live in this SPM bundle; must sit next to the Mach-O (same as swift build output).
+  if [[ "$exec_in_macos" == "BrainAIInstaller" ]]; then
+    cp -R "$INSTALLER_RES_BUNDLE" "$app_path/Contents/MacOS/"
+  fi
 
   local info="$app_path/Contents/Info.plist"
   plutil -create xml1 "$info"
@@ -99,6 +119,11 @@ assemble_app() {
   plist_set_string "$info" SUFeedURL "$SUFeedURL"
   if [[ "$lsui" == "true" ]]; then
     plist_set_bool "$info" LSUIElement true
+  fi
+
+  # So macOS treats the app as multilingual (helps locale resolution for bundled resources).
+  if [[ "$exec_in_macos" == "BrainAIInstaller" ]]; then
+    plist_set_localizations "$info"
   fi
 
   printf '%s' "APPL????" >"$app_path/Contents/PkgInfo"
@@ -131,8 +156,10 @@ sign_app() {
   fi
   local fw="$app/Contents/MacOS/Sparkle.framework"
   local rb="$app/Contents/MacOS/BrainAI_BrainAICore.bundle"
+  local inst_rb="$app/Contents/MacOS/BrainAI_BrainAIInstaller.bundle"
   [[ -d "$fw" ]] && sign_if_needed "$fw"
   [[ -d "$rb" ]] && sign_if_needed "$rb"
+  [[ -d "$inst_rb" ]] && sign_if_needed "$inst_rb"
   # Sign each Mach-O inside MacOS (executable only; avoid re-signing framework copies)
   local m="$app/Contents/MacOS"
   local f
@@ -140,6 +167,7 @@ sign_app() {
     [[ -f "$f" ]] && [[ -x "$f" ]] || continue
     [[ "$f" == "$m/Sparkle.framework" ]] && continue
     [[ "$f" == "$m/BrainAI_BrainAICore.bundle" ]] && continue
+    [[ "$f" == "$m/BrainAI_BrainAIInstaller.bundle" ]] && continue
     sign_if_needed "$f"
   done
   sign_if_needed "$app"

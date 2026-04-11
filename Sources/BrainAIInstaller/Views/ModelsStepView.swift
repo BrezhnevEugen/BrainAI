@@ -4,25 +4,41 @@ import SwiftUI
 struct ModelsStepView: View {
     @Bindable var viewModel: InstallerViewModel
 
-    private let modelOptions: [(id: String, name: String, size: String, ramReq: String)] = [
-        ("qwen2.5:7b", "Qwen 2.5 7B", "~4.5 GB", "8 GB"),
-        ("qwen2.5:14b", "Qwen 2.5 14B", "~9 GB", "16 GB"),
-        ("qwen2.5:32b", "Qwen 2.5 32B", "~20 GB", "32 GB"),
-    ]
+    private var modelOptions: [(id: String, name: String, size: String, ramLabel: String, ramGB: UInt64)] {
+        [
+            ("qwen2.5:7b", InstallerL10n.Models.qwen7b, InstallerL10n.Models.size45, InstallerL10n.Models.ram8, 8),
+            ("qwen2.5:14b", InstallerL10n.Models.qwen14b, InstallerL10n.Models.size9, InstallerL10n.Models.ram16, 16),
+            ("qwen2.5:32b", InstallerL10n.Models.qwen32b, InstallerL10n.Models.size20, InstallerL10n.Models.ram32, 32),
+        ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Model Selection")
+            Text(InstallerL10n.Models.title)
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Choose a language model based on your available RAM (\(viewModel.systemRAM) GB detected).")
+            Text(InstallerL10n.Models.ramHint(gb: viewModel.systemRAM))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            if viewModel.isScanningOllamaModels {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(InstallerL10n.Models.scanning)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text(InstallerL10n.Models.scanHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // LLM Model selection
             VStack(alignment: .leading, spacing: 8) {
-                Text("Language Model")
+                Text(InstallerL10n.Models.languageSection)
                     .font(.callout)
                     .fontWeight(.medium)
 
@@ -46,14 +62,23 @@ struct ModelsStepView: View {
                             Text("nomic-embed-text")
                                 .font(.callout)
                                 .fontWeight(.medium)
-                            Text("Recommended")
+                            Text(InstallerL10n.Models.recommended)
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.accentColor.opacity(0.15))
                                 .cornerRadius(4)
+                            if viewModel.isOllamaModelInstalled("nomic-embed-text") {
+                                Text(InstallerL10n.Models.installed)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.green.opacity(0.15))
+                                    .foregroundStyle(.green)
+                                    .cornerRadius(4)
+                            }
                         }
-                        Text("Embedding model for vector search (~300 MB)")
+                        Text(embeddingModelSubtitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -63,24 +88,80 @@ struct ModelsStepView: View {
 
             Spacer()
 
-            // Download size estimate
-            HStack {
+            installPreviewFooter
+        }
+        .task {
+            await viewModel.scanInstalledOllamaModels()
+        }
+    }
+
+    @ViewBuilder
+    private var installPreviewFooter: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: "arrow.down.circle")
                     .foregroundStyle(.secondary)
-                Text("Total download: ")
+                Text(InstallerL10n.Models.approxDownload)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Text(viewModel.estimatedDiskSpace)
                     .font(.callout)
                     .fontWeight(.medium)
             }
+
+            Text(InstallerL10n.Models.appNote)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(InstallerL10n.Models.plannedSteps)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            if viewModel.plannedInstallStepSummaries.isEmpty {
+                Text(InstallerL10n.Models.nothingToRun)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .italic()
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(viewModel.plannedInstallStepSummaries) { step in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "terminal")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .frame(width: 14, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(step.title)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Text(step.subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.25))
+                .cornerRadius(8)
+            }
         }
     }
 
-    private func modelCard(_ model: (id: String, name: String, size: String, ramReq: String)) -> some View {
+    private var embeddingModelSubtitle: String {
+        if viewModel.isOllamaModelInstalled("nomic-embed-text") {
+            return InstallerL10n.Models.embeddingSubInstalled
+        }
+        return InstallerL10n.Models.embeddingSubPending
+    }
+
+    private func modelCard(_ model: (id: String, name: String, size: String, ramLabel: String, ramGB: UInt64)) -> some View {
         let isRecommended = model.id == viewModel.recommendedModel
-        let ramGB = UInt64(model.ramReq.replacingOccurrences(of: " GB", with: "")) ?? 0
-        let hasEnoughRAM = viewModel.systemRAM >= ramGB
+        let hasEnoughRAM = viewModel.systemRAM >= model.ramGB
+        let isInstalled = viewModel.isOllamaModelInstalled(model.id)
 
         return Button {
             viewModel.selectedLLMModel = model.id
@@ -96,7 +177,16 @@ struct ModelsStepView: View {
                             .fontWeight(.medium)
                             .foregroundStyle(.primary)
                         if isRecommended {
-                            Text("Recommended")
+                            Text(InstallerL10n.Models.recommended)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.green.opacity(0.15))
+                                .foregroundStyle(.green)
+                                .cornerRadius(4)
+                        }
+                        if isInstalled {
+                            Text(InstallerL10n.Models.installed)
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -106,12 +196,14 @@ struct ModelsStepView: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        Text("Size: \(model.size)")
+                        Text(isInstalled ? InstallerL10n.Models.noDownload : InstallerL10n.Models.sizeLine(model.size))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("Requires: \(model.ramReq) RAM")
-                            .font(.caption)
-                            .foregroundStyle(hasEnoughRAM ? Color.secondary : Color.red)
+                        if !isInstalled {
+                            Text(InstallerL10n.Models.requiresRAM(model.ramLabel))
+                                .font(.caption)
+                                .foregroundStyle(hasEnoughRAM ? Color.secondary : Color.red)
+                        }
                     }
                 }
 

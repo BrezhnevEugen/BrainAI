@@ -6,11 +6,11 @@ struct ProviderStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("AI Provider Setup")
+            Text(InstallerL10n.Provider.title)
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Choose your primary AI provider. You can change this later in Settings.")
+            Text(InstallerL10n.Provider.subtitle)
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -23,15 +23,15 @@ struct ProviderStepView: View {
             // API key input if cloud provider selected
             if viewModel.selectedProvider == .openai {
                 apiKeyField(
-                    title: "OpenAI API Key",
-                    placeholder: "sk-...",
+                    title: InstallerL10n.Provider.openAIKeyTitle,
+                    placeholder: InstallerL10n.Provider.placeholderOpenAI,
                     text: $viewModel.openAIKey,
                     helpURL: "https://platform.openai.com/api-keys"
                 )
             } else if viewModel.selectedProvider == .anthropic {
                 apiKeyField(
-                    title: "Anthropic API Key",
-                    placeholder: "sk-ant-...",
+                    title: InstallerL10n.Provider.anthropicKeyTitle,
+                    placeholder: InstallerL10n.Provider.placeholderAnthropic,
                     text: $viewModel.anthropicKey,
                     helpURL: "https://console.anthropic.com/settings/keys"
                 )
@@ -52,7 +52,7 @@ struct ProviderStepView: View {
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.rawValue)
+                    Text(provider.localizedTitle)
                         .font(.callout)
                         .fontWeight(.medium)
                         .foregroundStyle(.primary)
@@ -86,14 +86,14 @@ struct ProviderStepView: View {
                     .font(.callout)
                     .fontWeight(.medium)
                 Spacer()
-                Link("Get API Key", destination: URL(string: helpURL)!)
+                Link(InstallerL10n.Provider.getAPIKey, destination: URL(string: helpURL)!)
                     .font(.caption)
             }
 
             SecureField(placeholder, text: text)
                 .textFieldStyle(.roundedBorder)
 
-            Text("Your API key is stored securely in the macOS Keychain.")
+            Text(InstallerL10n.Provider.keychainNote)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -113,10 +113,10 @@ struct ProviderStepView: View {
 
     private func descriptionForProvider(_ provider: ProviderChoice) -> String {
         switch provider {
-        case .ollama: "Run AI models locally on your Mac. Private and offline."
-        case .openai: "Use GPT-4 and other models via cloud API."
-        case .anthropic: "Use Claude models via cloud API."
-        case .skip: "Configure AI provider later in application settings."
+        case .ollama: InstallerL10n.Provider.descOllama
+        case .openai: InstallerL10n.Provider.descOpenAI
+        case .anthropic: InstallerL10n.Provider.descAnthropic
+        case .skip: InstallerL10n.Provider.descSkip
         }
     }
 }

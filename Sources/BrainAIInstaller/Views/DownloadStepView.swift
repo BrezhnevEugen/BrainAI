@@ -6,16 +6,16 @@ struct DownloadStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Installing Components")
+            Text(InstallerL10n.Download.title)
                 .font(.title2)
                 .fontWeight(.semibold)
 
             if viewModel.isDownloading {
-                Text("Please wait while components are being installed...")
+                Text(InstallerL10n.Download.waiting)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else if viewModel.downloadTasks.allSatisfy({ taskCompleted($0) }) {
-                Text("All components installed successfully.")
+                Text(InstallerL10n.Download.success)
                     .font(.callout)
                     .foregroundStyle(.green)
             }
@@ -36,7 +36,7 @@ struct DownloadStepView: View {
 
                 VStack(spacing: 6) {
                     ProgressView(value: Double(completed), total: Double(total))
-                    Text("Step \(completed + 1) of \(total)")
+                    Text(InstallerL10n.Download.step(current: completed + 1, total: total))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -62,7 +62,7 @@ struct DownloadStepView: View {
 
                 switch task.status {
                 case .pending:
-                    Text("Waiting...")
+                    Text(InstallerL10n.Download.statusWaiting)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 case .inProgress:
@@ -70,7 +70,7 @@ struct DownloadStepView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 case .completed:
-                    Text("Completed")
+                    Text(InstallerL10n.Download.statusCompleted)
                         .font(.caption)
                         .foregroundStyle(.green)
                 case .failed(let error):
@@ -85,7 +85,7 @@ struct DownloadStepView: View {
 
             // Retry button for failed tasks
             if case .failed = task.status {
-                Button("Retry") {
+                Button(InstallerL10n.Download.retry) {
                     Task { await retryTask(task) }
                 }
                 .font(.caption)
