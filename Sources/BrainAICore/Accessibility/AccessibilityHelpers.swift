@@ -49,17 +49,23 @@ public enum AccessibilityID {
 public extension View {
 
     /// Add standard VoiceOver label and hint
+    @ViewBuilder
     func brainAIAccessible(
         label: String,
         hint: String? = nil,
         identifier: String? = nil,
         traits: AccessibilityTraits = []
     ) -> some View {
-        self
+        let base = self
             .accessibilityLabel(label)
-            .accessibilityHint(hint.map { Text($0) } ?? Text(""))
             .accessibilityIdentifier(identifier ?? "")
             .accessibilityAddTraits(traits)
+
+        if let hint {
+            base.accessibilityHint(hint)
+        } else {
+            base
+        }
     }
 
     /// Mark as a header for VoiceOver navigation
@@ -99,7 +105,13 @@ public final class FocusManager: @unchecked Sendable {
         case noteEditor
     }
 
-    public var currentFocus: FocusTarget?
+    public var currentFocus: FocusTarget? {
+        get { lock.lock(); defer { lock.unlock() }; return _currentFocus }
+        set { lock.lock(); _currentFocus = newValue; lock.unlock() }
+    }
+
+    private var _currentFocus: FocusTarget?
+    private let lock = NSLock()
 
     public init() {}
 

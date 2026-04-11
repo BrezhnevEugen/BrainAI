@@ -89,12 +89,19 @@ public final class RemoteConnectionManager: @unchecked Sendable {
         connectionState = .connecting
         lock.unlock()
 
-        let pinnedHashes = config.tlsPinnedHashes.isEmpty ? nil : Set(config.tlsPinnedHashes)
-        let newClient = RemoteLightRAGClient(
-            baseURL: config.baseURL,
-            authToken: config.authToken,
-            pinnedCertificateHashes: pinnedHashes
-        )
+        let newClient: RemoteLightRAGClient
+        if !config.tlsPinnedHashes.isEmpty {
+            newClient = RemoteLightRAGClient.withTLSPinning(
+                baseURL: config.baseURL,
+                authToken: config.authToken,
+                pinnedCertificateHashes: Set(config.tlsPinnedHashes)
+            )
+        } else {
+            newClient = RemoteLightRAGClient(
+                baseURL: config.baseURL,
+                authToken: config.authToken
+            )
+        }
 
         lock.lock()
         client = newClient
@@ -205,13 +212,18 @@ public final class RemoteConnectionManager: @unchecked Sendable {
 // MARK: - Enhanced Remote Client
 
 extension RemoteLightRAGClient {
-    /// Convenience initializer with TLS pinning support
-    public convenience init(
+    /// Factory method to create a client with TLS pinning support
+    public static func withTLSPinning(
         baseURL: String,
         authToken: String? = nil,
-        pinnedCertificateHashes: Set<String>? = nil
-    ) {
-        // The base HTTPClient now supports TLS pinning
-        self.init(baseURL: baseURL, authToken: authToken)
+        pinnedCertificateHashes: Set<String>
+    ) -> RemoteLightRAGClient {
+        RemoteLightRAGClient(
+            httpClient: HTTPClient(
+                baseURL: baseURL,
+                authToken: authToken,
+                pinnedCertificateHashes: pinnedCertificateHashes
+            )
+        )
     }
 }

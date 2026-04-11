@@ -175,6 +175,11 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
         self.httpClient = HTTPClient(baseURL: baseURL, authToken: authToken)
     }
 
+    /// Internal initializer accepting a pre-configured HTTPClient (for TLS pinning)
+    internal init(httpClient: HTTPClient) {
+        self.httpClient = httpClient
+    }
+
     // MARK: - LightRAGClientProtocol Conformance
 
     public func query(
