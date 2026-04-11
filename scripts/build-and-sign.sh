@@ -116,6 +116,7 @@ assemble_app() {
   plist_set_string "$info" CFBundleVersion "$VERSION"
   plist_set_string "$info" LSMinimumSystemVersion "14.0"
   plist_set_bool "$info" NSHighResolutionCapable true
+  plist_set_string "$info" NSUserNotificationsUsageDescription "BrainAI shows alerts when local AI services stop responding or for important updates."
   plist_set_string "$info" SUFeedURL "$SUFeedURL"
   if [[ "$lsui" == "true" ]]; then
     plist_set_bool "$info" LSUIElement true

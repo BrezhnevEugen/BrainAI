@@ -70,6 +70,27 @@
 "settings.theme" = "Тема оформлення";
 "settings.check_updates" = "Перевірити оновлення";
 "settings.auto_updates" = "Перевіряти оновлення автоматично";
+"settings.notifications.section" = "Сповіщення";
+"settings.notifications.status_label" = "Цей застосунок (Налаштування)";
+"settings.notifications.status.not_determined" = "Запит ще не показувався";
+"settings.notifications.status.denied" = "Заборонено — увімкніть у «Системних налаштуваннях»";
+"settings.notifications.status.authorized" = "Дозволено";
+"settings.notifications.status.provisional" = "Попередньо";
+"settings.notifications.status.ephemeral" = "Тимчасово";
+"settings.notifications.status.unknown" = "Невідомо";
+"settings.notifications.status.unpackaged" = "Недоступно (запускайте з .app, не з теки збірки)";
+"settings.notifications.allow" = "Дозволити сповіщення…";
+"settings.notifications.open_prefs" = "Відкрити налаштування сповіщень…";
+"settings.notifications.send_test" = "Тестове сповіщення";
+"settings.notifications.help_tray" = "Про стан сервісів (Ollama / LightRAG) сповіщає застосунок у рядку меню «Brain AI Tray». Дозвольте сповіщення й для нього: Системні налаштування → Сповіщення.";
+"settings.notifications.help_denied" = "Як увімкнути: Системні налаштування → Сповіщення → оберіть BrainAI, Brain AI Tray або BrainAI Settings і ввімкніть оповіщення.";
+"settings.notifications.test.title" = "BrainAI";
+"settings.notifications.test.body" = "Тестове сповіщення з Налаштувань.";
+
+"notifications.ollama_stopped.title" = "Ollama";
+"notifications.ollama_stopped.body" = "Ollama недоступна.";
+"notifications.lightrag_stopped.title" = "LightRAG";
+"notifications.lightrag_stopped.body" = "Сервер LightRAG недоступний.";
 
 /* Server */
 "server.local" = "Локальний";

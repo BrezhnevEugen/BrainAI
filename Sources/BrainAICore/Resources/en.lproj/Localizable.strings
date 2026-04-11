@@ -70,6 +70,27 @@
 "settings.theme" = "Theme";
 "settings.check_updates" = "Check for Updates";
 "settings.auto_updates" = "Automatically Check for Updates";
+"settings.notifications.section" = "Notifications";
+"settings.notifications.status_label" = "This app (Settings)";
+"settings.notifications.status.not_determined" = "Not requested yet";
+"settings.notifications.status.denied" = "Denied — enable in System Settings";
+"settings.notifications.status.authorized" = "Allowed";
+"settings.notifications.status.provisional" = "Provisional";
+"settings.notifications.status.ephemeral" = "Ephemeral";
+"settings.notifications.status.unknown" = "Unknown";
+"settings.notifications.status.unpackaged" = "N/A (run from .app, not raw build folder)";
+"settings.notifications.allow" = "Allow Notifications…";
+"settings.notifications.open_prefs" = "Open Notification Settings…";
+"settings.notifications.send_test" = "Send Test Notification";
+"settings.notifications.help_tray" = "Service alerts (Ollama / LightRAG) are sent by the menu bar app «Brain AI Tray». Allow notifications for that app as well in System Settings → Notifications.";
+"settings.notifications.help_denied" = "To turn notifications on: System Settings → Notifications → select BrainAI, Brain AI Tray, or BrainAI Settings, then enable alerts.";
+"settings.notifications.test.title" = "BrainAI";
+"settings.notifications.test.body" = "Test notification from Settings.";
+
+"notifications.ollama_stopped.title" = "Ollama";
+"notifications.ollama_stopped.body" = "Ollama is no longer reachable.";
+"notifications.lightrag_stopped.title" = "LightRAG";
+"notifications.lightrag_stopped.body" = "LightRAG server is no longer reachable.";
 
 /* Server */
 "server.local" = "Local";

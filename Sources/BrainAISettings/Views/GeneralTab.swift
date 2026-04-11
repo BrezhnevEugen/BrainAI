@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import BrainAICore
 import ServiceManagement
 
@@ -7,6 +8,8 @@ import ServiceManagement
 struct GeneralTab: View {
     @State private var config = AppConfiguration.shared
     @State private var launchAtLogin = false
+    @State private var notificationStatusText = "—"
+    @State private var notificationAuth: UNAuthorizationStatus = .notDetermined
 
     var body: some View {
         Form {
@@ -43,6 +46,55 @@ struct GeneralTab: View {
                 .help("Controls whether services start automatically when the app launches")
             } header: {
                 Text("Startup")
+            }
+
+            // MARK: - Notifications
+            Section {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(L10n.SettingsNotifications.statusLabel)
+                    Spacer()
+                    Text(notificationStatusText)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                Button(L10n.SettingsNotifications.allowButton) {
+                    Task { @MainActor in
+                        _ = await UserNotificationService.shared.requestAuthorization()
+                        await refreshNotificationState()
+                    }
+                }
+                .disabled(!UserNotificationService.isNotificationCenterAvailable)
+
+                Button(L10n.SettingsNotifications.openPrefsButton) {
+                    UserNotificationService.openSystemNotificationSettings()
+                }
+
+                Button(L10n.SettingsNotifications.sendTestButton) {
+                    Task { @MainActor in
+                        await UserNotificationService.shared.postImmediate(
+                            title: L10n.SettingsNotifications.testTitle,
+                            body: L10n.SettingsNotifications.testBody,
+                            identifier: "com.brainai.settings.test"
+                        )
+                    }
+                }
+                .disabled(
+                    !UserNotificationService.isNotificationCenterAvailable
+                        || (notificationAuth != .authorized && notificationAuth != .provisional)
+                )
+
+                if UserNotificationService.isNotificationCenterAvailable && notificationAuth == .denied {
+                    Text(L10n.SettingsNotifications.helpDenied)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text(L10n.SettingsNotifications.section)
+            } footer: {
+                Text(L10n.SettingsNotifications.helpTray)
+                    .font(.caption)
             }
 
             // MARK: - Updates
@@ -92,6 +144,10 @@ struct GeneralTab: View {
         .navigationTitle("General")
         .onAppear {
             loadLaunchAtLoginState()
+            UserNotificationService.shared.configure()
+            Task { @MainActor in
+                await refreshNotificationState()
+            }
         }
     }
 
@@ -106,6 +162,28 @@ struct GeneralTab: View {
     private func loadLaunchAtLoginState() {
         if #available(macOS 13.0, *) {
             launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+    }
+
+    @MainActor
+    private func refreshNotificationState() async {
+        guard UserNotificationService.isNotificationCenterAvailable else {
+            notificationAuth = .denied
+            notificationStatusText = L10n.SettingsNotifications.statusUnpackagedBinary
+            return
+        }
+        let status = await UserNotificationService.shared.authorizationStatus()
+        notificationAuth = status
+        notificationStatusText = localizedAuthorizationStatus(status)
+    }
+
+    private func localizedAuthorizationStatus(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return L10n.SettingsNotifications.statusNotDetermined
+        case .denied: return L10n.SettingsNotifications.statusDenied
+        case .authorized: return L10n.SettingsNotifications.statusAuthorized
+        case .provisional: return L10n.SettingsNotifications.statusProvisional
+        @unknown default: return L10n.SettingsNotifications.statusUnknown
         }
     }
 

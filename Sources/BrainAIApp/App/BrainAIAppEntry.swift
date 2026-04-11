@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import BrainAICore
 
 // MARK: - Notifications (menu → SwiftUI)
 
@@ -30,6 +31,7 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserNotificationService.shared.configure()
         setupMainMenu()
         // Building NSHostingController synchronously inside didFinishLaunching can starve the
         // first run-loop turns; defer so AppKit marks the app responsive and SwiftUI gets a clean first frame.

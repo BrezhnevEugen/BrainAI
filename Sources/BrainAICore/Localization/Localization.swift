@@ -130,6 +130,33 @@ public final class L10n: Sendable {
         public static var restart: String { tr("server.restart") }
     }
 
+    // MARK: - Settings / Notifications
+
+    public enum SettingsNotifications {
+        public static var section: String { tr("settings.notifications.section") }
+        public static var statusLabel: String { tr("settings.notifications.status_label") }
+        public static var statusNotDetermined: String { tr("settings.notifications.status.not_determined") }
+        public static var statusDenied: String { tr("settings.notifications.status.denied") }
+        public static var statusAuthorized: String { tr("settings.notifications.status.authorized") }
+        public static var statusProvisional: String { tr("settings.notifications.status.provisional") }
+        public static var statusUnknown: String { tr("settings.notifications.status.unknown") }
+        public static var statusUnpackagedBinary: String { tr("settings.notifications.status.unpackaged") }
+        public static var allowButton: String { tr("settings.notifications.allow") }
+        public static var openPrefsButton: String { tr("settings.notifications.open_prefs") }
+        public static var sendTestButton: String { tr("settings.notifications.send_test") }
+        public static var helpTray: String { tr("settings.notifications.help_tray") }
+        public static var helpDenied: String { tr("settings.notifications.help_denied") }
+        public static var testTitle: String { tr("settings.notifications.test.title") }
+        public static var testBody: String { tr("settings.notifications.test.body") }
+    }
+
+    public enum ServiceNotifications {
+        public static var ollamaStoppedTitle: String { tr("notifications.ollama_stopped.title") }
+        public static var ollamaStoppedBody: String { tr("notifications.ollama_stopped.body") }
+        public static var lightragStoppedTitle: String { tr("notifications.lightrag_stopped.title") }
+        public static var lightragStoppedBody: String { tr("notifications.lightrag_stopped.body") }
+    }
+
     // MARK: - Tray
 
     public enum Tray {

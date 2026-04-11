@@ -70,6 +70,27 @@
 "settings.theme" = "Тема оформления";
 "settings.check_updates" = "Проверить обновления";
 "settings.auto_updates" = "Проверять обновления автоматически";
+"settings.notifications.section" = "Уведомления";
+"settings.notifications.status_label" = "Это приложение (Настройки)";
+"settings.notifications.status.not_determined" = "Запрос ещё не показывался";
+"settings.notifications.status.denied" = "Запрещено — включите в «Системных настройках»";
+"settings.notifications.status.authorized" = "Разрешено";
+"settings.notifications.status.provisional" = "Предварительно";
+"settings.notifications.status.ephemeral" = "Временно";
+"settings.notifications.status.unknown" = "Неизвестно";
+"settings.notifications.status.unpackaged" = "Недоступно (запускайте из .app, не из папки сборки)";
+"settings.notifications.allow" = "Разрешить уведомления…";
+"settings.notifications.open_prefs" = "Открыть настройки уведомлений…";
+"settings.notifications.send_test" = "Тестовое уведомление";
+"settings.notifications.help_tray" = "О статусе сервисов (Ollama / LightRAG) уведомляет приложение в строке меню «Brain AI Tray». Разрешите уведомления и для него: Системные настройки → Уведомления.";
+"settings.notifications.help_denied" = "Как включить: Системные настройки → Уведомления → выберите BrainAI, Brain AI Tray или BrainAI Settings и включите оповещения.";
+"settings.notifications.test.title" = "BrainAI";
+"settings.notifications.test.body" = "Тестовое уведомление из Настроек.";
+
+"notifications.ollama_stopped.title" = "Ollama";
+"notifications.ollama_stopped.body" = "Ollama недоступна.";
+"notifications.lightrag_stopped.title" = "LightRAG";
+"notifications.lightrag_stopped.body" = "Сервер LightRAG недоступен.";
 
 /* Server */
 "server.local" = "Локальный";

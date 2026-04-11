@@ -35,6 +35,13 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserNotificationService.shared.configure()
+        Task {
+            let status = await UserNotificationService.shared.authorizationStatus()
+            if status == .notDetermined {
+                _ = await UserNotificationService.shared.requestAuthorization()
+            }
+        }
         setupStatusItem()
         startMonitoring()
     }
@@ -56,17 +63,34 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         rebuildMenu()
     }
 
+    /// Disabled `NSMenuItem` rows are dimmed by the system on vibrant menus — use enabled + no-op for read-only rows.
+    private func markInertMenuRow(_ item: NSMenuItem) {
+        item.isEnabled = true
+        item.action = #selector(trayInertMenuAction)
+    }
+
+    @objc private func trayInertMenuAction() {}
+
+    /// Darken system accent colors slightly so they stay legible on light menu vibrancy.
+    private func menuAccentTextColor(_ base: NSColor) -> NSColor {
+        guard let rgb = base.usingColorSpace(.deviceRGB),
+              let black = NSColor.black.usingColorSpace(.deviceRGB) else { return base }
+        return rgb.blended(withFraction: 0.42, of: black) ?? base
+    }
+
     private func rebuildMenu() {
         let menu = NSMenu()
 
         // Status header
-        let titleItem = NSMenuItem(title: "BrainAI", action: nil, keyEquivalent: "")
+        let titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         titleItem.attributedTitle = NSAttributedString(
             string: "BrainAI",
             attributes: [
-                .font: NSFont.boldSystemFont(ofSize: 13)
+                .font: NSFont.boldSystemFont(ofSize: 13),
+                .foregroundColor: NSColor.labelColor,
             ]
         )
+        markInertMenuRow(titleItem)
         menu.addItem(titleItem)
         menu.addItem(NSMenuItem.separator())
 
@@ -85,12 +109,13 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
             let latencyItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-            let latencyColor: NSColor = latencyMs < 200 ? .systemGreen : (latencyMs < 500 ? .systemYellow : .systemRed)
+            let rawLatency: NSColor = latencyMs < 200 ? .systemGreen : (latencyMs < 500 ? .systemYellow : .systemRed)
+            let latencyColor = menuAccentTextColor(rawLatency)
             latencyItem.attributedTitle = NSAttributedString(
                 string: "  Latency: \(latencyMs)ms",
                 attributes: [.font: font, .foregroundColor: latencyColor]
             )
-            latencyItem.isEnabled = false
+            markInertMenuRow(latencyItem)
             menu.addItem(latencyItem)
         }
 
@@ -105,8 +130,15 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Model info
-        let modelItem = NSMenuItem(title: "Model: \(AppConfiguration.shared.generationRole.modelID)", action: nil, keyEquivalent: "")
-        modelItem.isEnabled = false
+        let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        modelItem.attributedTitle = NSAttributedString(
+            string: "Model: \(AppConfiguration.shared.generationRole.modelID)",
+            attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
+                .foregroundColor: NSColor.labelColor,
+            ]
+        )
+        markInertMenuRow(modelItem)
         menu.addItem(modelItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -133,27 +165,35 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeStatusItem(name: String, isRunning: Bool) -> NSMenuItem {
         let symbol = isRunning ? "circle.fill" : "circle"
-        let color: NSColor = isRunning ? .systemGreen : .systemRed
+        let accent = menuAccentTextColor(isRunning ? .systemGreen : .systemRed)
         let title = "\(name): \(isRunning ? "Running" : "Stopped")"
 
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
 
         let attributed = NSMutableAttributedString()
         if let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
-            let tinted = symbolImage.withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+            let config = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [accent]))
+            let tinted = symbolImage.withSymbolConfiguration(config)
             let attachment = NSTextAttachment()
             attachment.image = tinted
             attributed.append(NSAttributedString(attachment: attachment))
             attributed.append(NSAttributedString(string: " "))
         }
 
-        let textAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-            .foregroundColor: color
+        let mono = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: mono,
+            .foregroundColor: NSColor.labelColor,
         ]
-        attributed.append(NSAttributedString(string: title, attributes: textAttrs))
+        let stateAttrs: [NSAttributedString.Key: Any] = [
+            .font: mono,
+            .foregroundColor: accent,
+        ]
+        attributed.append(NSAttributedString(string: "\(name): ", attributes: nameAttrs))
+        attributed.append(NSAttributedString(string: isRunning ? "Running" : "Stopped", attributes: stateAttrs))
         item.attributedTitle = attributed
-        item.isEnabled = false
+        markInertMenuRow(item)
 
         return item
     }
@@ -172,27 +212,28 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         let filled = String(repeating: "\u{2588}", count: filledCount)
         let empty = String(repeating: "\u{2591}", count: emptyCount)
 
-        let color: NSColor
+        let rawBar: NSColor
         switch percentage {
-        case ..<0.50: color = .systemGreen
-        case ..<0.70: color = .systemYellow
-        case ..<0.85: color = .systemOrange
-        default: color = .systemRed
+        case ..<0.50: rawBar = .systemGreen
+        case ..<0.70: rawBar = .systemYellow
+        case ..<0.85: rawBar = .systemOrange
+        default: rawBar = .systemRed
         }
+        let color = menuAccentTextColor(rawBar)
 
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         let attributed = NSMutableAttributedString()
 
-        let labelStr = String(format: "%-4s ", label.padding(toLength: 4, withPad: " ", startingAt: 0))
+        let labelStr = label.padding(toLength: 4, withPad: " ", startingAt: 0) + " "
         attributed.append(NSAttributedString(string: labelStr, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
         attributed.append(NSAttributedString(string: filled, attributes: [.font: font, .foregroundColor: color]))
-        attributed.append(NSAttributedString(string: empty, attributes: [.font: font, .foregroundColor: NSColor.tertiaryLabelColor]))
+        attributed.append(NSAttributedString(string: empty, attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
 
         let stats = String(format: " %.1f/%.1f GB", usedGB, totalGB)
-        attributed.append(NSAttributedString(string: stats, attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+        attributed.append(NSAttributedString(string: stats, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
 
         item.attributedTitle = attributed
-        item.isEnabled = false
+        markInertMenuRow(item)
         return item
     }
 
@@ -210,9 +251,9 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
         item.attributedTitle = NSAttributedString(string: text, attributes: [
             .font: font,
-            .foregroundColor: bytes > 0 ? NSColor.labelColor : NSColor.tertiaryLabelColor
+            .foregroundColor: bytes > 0 ? NSColor.labelColor : NSColor.secondaryLabelColor,
         ])
-        item.isEnabled = false
+        markInertMenuRow(item)
         return item
     }
 
@@ -232,23 +273,46 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
     private func checkServiceStatuses() {
         Task {
+            let previousOllama = await MainActor.run { ollamaRunning }
+            let previousLightRAG = await MainActor.run { lightRAGRunning }
+
             let ollamaAPI = OllamaAPIClient(
                 baseURL: "http://localhost:\(AppConfiguration.shared.ollamaPort)"
             )
             let isOllamaHealthy = try? await ollamaAPI.healthCheck()
             await MainActor.run {
                 ollamaRunning = isOllamaHealthy == true
+                rebuildMenu()
             }
 
             let lightragClient = LocalLightRAGClient()
             let health = try? await lightragClient.healthCheck()
 
-            // Check remote connection state
             let remState = remoteConnectionManager.connectionState
             let latency = remoteConnectionManager.lastLatency
+            let lightNow = health != nil
 
             await MainActor.run {
-                lightRAGRunning = health != nil
+                if previousOllama && !ollamaRunning {
+                    Task {
+                        await UserNotificationService.shared.postImmediate(
+                            title: L10n.ServiceNotifications.ollamaStoppedTitle,
+                            body: L10n.ServiceNotifications.ollamaStoppedBody,
+                            identifier: "com.brainai.tray.ollama.down"
+                        )
+                    }
+                }
+                if previousLightRAG && !lightNow {
+                    Task {
+                        await UserNotificationService.shared.postImmediate(
+                            title: L10n.ServiceNotifications.lightragStoppedTitle,
+                            body: L10n.ServiceNotifications.lightragStoppedBody,
+                            identifier: "com.brainai.tray.lightrag.down"
+                        )
+                    }
+                }
+
+                lightRAGRunning = lightNow
                 remoteConnected = remState.isConnected
                 remoteLatency = latency
                 rebuildMenu()
