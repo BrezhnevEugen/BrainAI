@@ -323,15 +323,29 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Actions
 
     @objc private func openMainUI() {
-        let parent = Bundle.main.bundleURL.deletingLastPathComponent()
-        let mainApp = parent.appendingPathComponent("BrainAI.app", isDirectory: true)
-        if FileManager.default.fileExists(atPath: mainApp.path) {
+        if let mainApp = Self.urlForMainBrainAIAppAdjacentOrEmbedded() {
             NSWorkspace.shared.open(mainApp)
             return
         }
         if let url = URL(string: "http://localhost:9621") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// Main app next to the tray bundle (flat DMG) or any ancestor named `BrainAI.app` (single-app DMG).
+    private static func urlForMainBrainAIAppAdjacentOrEmbedded() -> URL? {
+        var cursor = Bundle.main.bundleURL
+        while cursor.path != "/" {
+            if cursor.lastPathComponent == "BrainAI.app" {
+                return cursor
+            }
+            cursor = cursor.deletingLastPathComponent()
+        }
+        let sibling = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("BrainAI.app", isDirectory: true)
+        if FileManager.default.fileExists(atPath: sibling.path) {
+            return sibling
+        }
+        return nil
     }
 
     @objc private func openSettings() {

@@ -47,6 +47,12 @@ public enum BrainAICompanionAppLauncher {
     }
 
     private static func openLegacySettingsCompanionFallback() {
+        if let mainURL = urlForBrainAIMainAppAncestorOrNil(from: Bundle.main.bundleURL) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.arguments = ["--open-settings"]
+            NSWorkspace.shared.openApplication(at: mainURL, configuration: config) { _, _ in }
+            return
+        }
         let parent = Bundle.main.bundleURL.deletingLastPathComponent()
         let settingsApp = parent.appendingPathComponent("BrainAI Settings.app", isDirectory: true)
         if FileManager.default.fileExists(atPath: settingsApp.path) {
@@ -63,5 +69,17 @@ public enum BrainAICompanionAppLauncher {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: settingsBundleIdentifier) {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// When helpers live inside `BrainAI.app/Contents/Resources/...`, walk up to the main bundle URL.
+    private static func urlForBrainAIMainAppAncestorOrNil(from bundleURL: URL) -> URL? {
+        var cursor = bundleURL
+        while cursor.path != "/" {
+            if cursor.lastPathComponent == "BrainAI.app" {
+                return cursor
+            }
+            cursor = cursor.deletingLastPathComponent()
+        }
+        return nil
     }
 }

@@ -14,6 +14,10 @@
 # Optional DMG layout: all .app bundles inside one folder (single drag into /Applications):
 #   DMG_SUITE_FOLDER=1 ./scripts/build-and-sign.sh
 #   DMG_SUITE_FOLDER=1 DMG_SUITE_FOLDER_NAME="BrainAI" ./scripts/build-and-sign.sh
+#
+# Single drag target: only BrainAI.app on the DMG; Tray, Installer, thin Settings live inside
+#   BrainAI.app/Contents/Resources/BrainAIEmbedded/ (see Tray + BrainAICompanionAppLauncher).
+#   DMG_SINGLE_APP=1 ./scripts/build-and-sign.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -151,8 +155,30 @@ assemble_app "BrainAI Tray.app" "$BUNDLE_ID_PREFIX.tray" "BrainAITray" "$BIN_DIR
 assemble_app "BrainAI Settings.app" "$BUNDLE_ID_PREFIX.settings" "BrainAISettings" "$BIN_DIR/BrainAISettings" "false"
 assemble_app "BrainAI Installer.app" "$BUNDLE_ID_PREFIX.installer" "BrainAIInstaller" "$BIN_DIR/BrainAIInstaller" "false"
 
+if [[ "${DMG_SINGLE_APP:-0}" == "1" ]]; then
+  EMBED="$STAGE_APPS/BrainAI.app/Contents/Resources/BrainAIEmbedded"
+  mkdir -p "$EMBED"
+  for _helper in "BrainAI Tray.app" "BrainAI Installer.app" "BrainAI Settings.app"; do
+    if [[ -d "$STAGE_APPS/$_helper" ]]; then
+      mv "$STAGE_APPS/$_helper" "$EMBED/"
+    fi
+  done
+  mkdir -p "$STAGE_APPS/BrainAI.app/Contents/Resources"
+  cat >"$STAGE_APPS/BrainAI.app/Contents/Resources/Как-открыть-установщик.txt" <<'EMBED_HELP'
+Первоначальная настройка (мастер установки):
+в Finder → BrainAI.app (правый клик) → «Показать содержимое пакета» → Contents → Resources → BrainAIEmbedded → BrainAI Installer.app
+
+Трей и «BrainAI Settings» запускаются из той же папки BrainAIEmbedded (или через ярлыки, если вы их создадите).
+EMBED_HELP
+fi
+
 if [[ -f "$ROOT/README.md" ]]; then
-  cp "$ROOT/README.md" "$STAGE_APPS/README.txt"
+  if [[ "${DMG_SINGLE_APP:-0}" == "1" ]]; then
+    mkdir -p "$STAGE_APPS/BrainAI.app/Contents/Resources"
+    cp "$ROOT/README.md" "$STAGE_APPS/BrainAI.app/Contents/Resources/README.txt"
+  else
+    cp "$ROOT/README.md" "$STAGE_APPS/README.txt"
+  fi
 fi
 
 sign_if_needed() {
@@ -219,13 +245,23 @@ sign_app() {
 }
 
 if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
-  for app in \
-    "$STAGE_APPS/BrainAI.app" \
-    "$STAGE_APPS/BrainAI Tray.app" \
-    "$STAGE_APPS/BrainAI Settings.app" \
-    "$STAGE_APPS/BrainAI Installer.app"; do
-    [[ -d "$app" ]] && sign_app "$app"
-  done
+  if [[ "${DMG_SINGLE_APP:-0}" == "1" ]]; then
+    EMBED="$STAGE_APPS/BrainAI.app/Contents/Resources/BrainAIEmbedded"
+    if [[ -d "$EMBED" ]]; then
+      for app in "$EMBED"/*.app; do
+        [[ -d "$app" ]] && sign_app "$app"
+      done
+    fi
+    sign_app "$STAGE_APPS/BrainAI.app"
+  else
+    for app in \
+      "$STAGE_APPS/BrainAI.app" \
+      "$STAGE_APPS/BrainAI Tray.app" \
+      "$STAGE_APPS/BrainAI Settings.app" \
+      "$STAGE_APPS/BrainAI Installer.app"; do
+      [[ -d "$app" ]] && sign_app "$app"
+    done
+  fi
 fi
 
 DMG_PATH="$DIST/BrainAI-$VERSION.dmg"
