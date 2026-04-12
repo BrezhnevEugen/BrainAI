@@ -60,17 +60,33 @@ final class KnowledgeGraphViewModel: @unchecked Sendable {
         clearError()
 
         do {
-            // If no specific label, load for each entity type
             var allNodes: [(id: String, label: String, type: String, description: String?)] = []
             var allEdges: [(source: String, target: String, description: String?, keywords: String?)] = []
             var seenNodeIds: Set<String> = []
 
-            let labelsToFetch = label.isEmpty ? entityLabels : [label]
+            var labelsToFetch: [String]
+            if !searchText.isEmpty {
+                labelsToFetch = try await lightRAGClient.searchGraphLabels(
+                    query: searchText,
+                    limit: min(100, maxItems)
+                )
+            } else {
+                labelsToFetch = label.isEmpty ? entityLabels : [label]
+            }
 
-            for entityLabel in labelsToFetch {
+            if labelsToFetch.isEmpty {
+                applyGraphData(nodes: [], edges: [])
+                setLoading(false)
+                return
+            }
+
+            let useWildcardOverview = searchText.isEmpty && label.isEmpty && labelsToFetch.count > 40
+            let labelsIteration = useWildcardOverview ? ["*"] : labelsToFetch
+
+            for entityLabel in labelsIteration {
                 let result = try await lightRAGClient.searchGraph(
                     label: entityLabel,
-                    searchText: searchText,
+                    searchText: "",
                     maxItems: maxItems
                 )
 

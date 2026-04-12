@@ -1,5 +1,29 @@
 import Foundation
 
+// MARK: - Graph label list JSON (array vs legacy object)
+
+private enum GraphLabelsAPIPayload: Decodable {
+    case list([String])
+    case legacy(GraphLabelsResponse)
+
+    init(from decoder: Decoder) throws {
+        if let c = try? decoder.singleValueContainer(), let arr = try? c.decode([String].self) {
+            self = .list(arr)
+            return
+        }
+        self = .legacy(try GraphLabelsResponse(from: decoder))
+    }
+
+    var normalized: GraphLabelsResponse {
+        switch self {
+        case .list(let arr):
+            return GraphLabelsResponse(entityLabels: arr, relationLabels: [])
+        case .legacy(let response):
+            return response
+        }
+    }
+}
+
 // MARK: - LightRAG Client Protocol
 
 /// Protocol for interacting with LightRAG knowledge graph API
@@ -40,7 +64,10 @@ public protocol LightRAGClientProtocol: Sendable {
     /// Get all graph labels (entity types and relation types)
     func getGraphLabels() async throws -> GraphLabelsResponse
 
-    /// Search graph nodes by label/type
+    /// Search entity/label names matching a query (`GET /graph/label/search`).
+    func searchGraphLabels(query: String, limit: Int) async throws -> [String]
+
+    /// Load a subgraph for a starting label (`GET /graphs`). `searchText` is ignored; filter with `searchGraphLabels` first.
     func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse
 
     /// Get entity details by name
@@ -80,7 +107,7 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
             topK: topK,
             onlyNeedContext: onlyNeedContext
         )
-        return try await httpClient.post("/api/query", body: request)
+        return try await httpClient.post("/query", body: request)
     }
 
     public func insertText(
@@ -88,25 +115,31 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
         description: String
     ) async throws -> InsertTextResponse {
         let request = InsertTextRequest(text: text, description: description)
-        return try await httpClient.post("/api/documents/text", body: request)
+        return try await httpClient.post("/documents/text", body: request)
     }
 
     public func createEntity(_ request: EntityCreateRequest) async throws {
         struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.post("/api/graph/entity/create", body: request)
+        let _: EmptyResponse = try await httpClient.post("/graph/entity/create", body: request)
     }
 
     public func createRelation(_ request: RelationCreateRequest) async throws {
         struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.post("/api/graph/relation/create", body: request)
+        let _: EmptyResponse = try await httpClient.post("/graph/relation/create", body: request)
     }
 
     public func deleteEntity(_ name: String) async throws {
-        struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.delete(
-            "/api/graph/entity",
-            queryParameters: ["name": name]
-        )
+        struct DeleteEntityBody: Encodable {
+            let entityName: String
+            enum CodingKeys: String, CodingKey {
+                case entityName = "entity_name"
+            }
+        }
+        struct DeletionResultWire: Decodable {
+            let status: String?
+        }
+        let body = DeleteEntityBody(entityName: name)
+        let _: DeletionResultWire = try await httpClient.post("/documents/delete_entity", body: body)
     }
 
     public func listDocuments(
@@ -121,7 +154,7 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
         if let status = status, !status.isEmpty {
             queryParams["status"] = status
         }
-        return try await httpClient.get("/api/documents/paginated", queryParameters: queryParams)
+        return try await httpClient.get("/documents/paginated", queryParameters: queryParams)
     }
 
     public func healthCheck() async throws -> HealthResponse {
@@ -129,22 +162,36 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
     }
 
     public func getGraphLabels() async throws -> GraphLabelsResponse {
-        return try await httpClient.get("/api/graph/labels")
+        let payload: GraphLabelsAPIPayload = try await httpClient.get("/graph/label/list")
+        return payload.normalized
     }
 
-    public func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse {
-        var params: [String: String] = [
+    public func searchGraphLabels(query: String, limit: Int) async throws -> [String] {
+        try await httpClient.get(
+            "/graph/label/search",
+            queryParameters: [
+                "q": query,
+                "limit": String(limit)
+            ]
+        )
+    }
+
+    public func searchGraph(label: String, searchText _: String, maxItems: Int) async throws -> GraphSearchResponse {
+        let params: [String: String] = [
             "label": label,
-            "max_items": String(maxItems)
+            "max_depth": "3",
+            "max_nodes": String(maxItems)
         ]
-        if !searchText.isEmpty {
-            params["search_text"] = searchText
-        }
-        return try await httpClient.get("/api/graph/search", queryParameters: params)
+        let dto: LightRAGKnowledgeGraphDTO = try await httpClient.get("/graphs", queryParameters: params)
+        return dto.toGraphSearchResponse()
     }
 
     public func getEntity(_ name: String) async throws -> GraphNodeData {
-        return try await httpClient.get("/api/graph/entity", queryParameters: ["name": name])
+        let subgraph = try await searchGraph(label: name, searchText: "", maxItems: 1)
+        guard let first = subgraph.nodes.first else {
+            throw HTTPClientError.decodingFailed("Entity not found: \(name)")
+        }
+        return first
     }
 
     public func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse {
@@ -158,7 +205,7 @@ public final class LocalLightRAGClient: LightRAGClientProtocol {
             }
         }
         let request = QueryDataRequest(question: question, mode: mode, topK: topK)
-        return try await httpClient.post("/api/query/data", body: request)
+        return try await httpClient.post("/query/data", body: request)
     }
 }
 
@@ -195,7 +242,7 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
             topK: topK,
             onlyNeedContext: onlyNeedContext
         )
-        return try await httpClient.post("/api/query", body: request)
+        return try await httpClient.post("/query", body: request)
     }
 
     public func insertText(
@@ -203,25 +250,31 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
         description: String
     ) async throws -> InsertTextResponse {
         let request = InsertTextRequest(text: text, description: description)
-        return try await httpClient.post("/api/documents/text", body: request)
+        return try await httpClient.post("/documents/text", body: request)
     }
 
     public func createEntity(_ request: EntityCreateRequest) async throws {
         struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.post("/api/graph/entity/create", body: request)
+        let _: EmptyResponse = try await httpClient.post("/graph/entity/create", body: request)
     }
 
     public func createRelation(_ request: RelationCreateRequest) async throws {
         struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.post("/api/graph/relation/create", body: request)
+        let _: EmptyResponse = try await httpClient.post("/graph/relation/create", body: request)
     }
 
     public func deleteEntity(_ name: String) async throws {
-        struct EmptyResponse: Decodable {}
-        let _: EmptyResponse = try await httpClient.delete(
-            "/api/graph/entity",
-            queryParameters: ["name": name]
-        )
+        struct DeleteEntityBody: Encodable {
+            let entityName: String
+            enum CodingKeys: String, CodingKey {
+                case entityName = "entity_name"
+            }
+        }
+        struct DeletionResultWire: Decodable {
+            let status: String?
+        }
+        let body = DeleteEntityBody(entityName: name)
+        let _: DeletionResultWire = try await httpClient.post("/documents/delete_entity", body: body)
     }
 
     public func listDocuments(
@@ -236,7 +289,7 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
         if let status = status, !status.isEmpty {
             queryParams["status"] = status
         }
-        return try await httpClient.get("/api/documents/paginated", queryParameters: queryParams)
+        return try await httpClient.get("/documents/paginated", queryParameters: queryParams)
     }
 
     public func healthCheck() async throws -> HealthResponse {
@@ -244,22 +297,36 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
     }
 
     public func getGraphLabels() async throws -> GraphLabelsResponse {
-        return try await httpClient.get("/api/graph/labels")
+        let payload: GraphLabelsAPIPayload = try await httpClient.get("/graph/label/list")
+        return payload.normalized
     }
 
-    public func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse {
-        var params: [String: String] = [
+    public func searchGraphLabels(query: String, limit: Int) async throws -> [String] {
+        try await httpClient.get(
+            "/graph/label/search",
+            queryParameters: [
+                "q": query,
+                "limit": String(limit)
+            ]
+        )
+    }
+
+    public func searchGraph(label: String, searchText _: String, maxItems: Int) async throws -> GraphSearchResponse {
+        let params: [String: String] = [
             "label": label,
-            "max_items": String(maxItems)
+            "max_depth": "3",
+            "max_nodes": String(maxItems)
         ]
-        if !searchText.isEmpty {
-            params["search_text"] = searchText
-        }
-        return try await httpClient.get("/api/graph/search", queryParameters: params)
+        let dto: LightRAGKnowledgeGraphDTO = try await httpClient.get("/graphs", queryParameters: params)
+        return dto.toGraphSearchResponse()
     }
 
     public func getEntity(_ name: String) async throws -> GraphNodeData {
-        return try await httpClient.get("/api/graph/entity", queryParameters: ["name": name])
+        let subgraph = try await searchGraph(label: name, searchText: "", maxItems: 1)
+        guard let first = subgraph.nodes.first else {
+            throw HTTPClientError.decodingFailed("Entity not found: \(name)")
+        }
+        return first
     }
 
     public func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse {
@@ -273,6 +340,6 @@ public final class RemoteLightRAGClient: LightRAGClientProtocol {
             }
         }
         let request = QueryDataRequest(question: question, mode: mode, topK: topK)
-        return try await httpClient.post("/api/query/data", body: request)
+        return try await httpClient.post("/query/data", body: request)
     }
 }

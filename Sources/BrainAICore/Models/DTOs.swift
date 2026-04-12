@@ -407,6 +407,82 @@ public struct GraphSearchResponse: Codable, Sendable {
     }
 }
 
+// MARK: - LightRAG `/graphs` wire format (HKUDS API server)
+
+/// Subgraph returned by `GET /graphs` (`KnowledgeGraph` in Python).
+struct LightRAGKnowledgeGraphDTO: Decodable, Sendable {
+    let nodes: [LightRAGKGNodeDTO]
+    let edges: [LightRAGKGEdgeDTO]
+    let isTruncated: Bool?
+}
+
+struct LightRAGKGNodeDTO: Decodable, Sendable {
+    let id: String
+    let labels: [String]
+    let properties: LightRAGKGNodeProperties?
+}
+
+/// Node `properties` may include `entity_type` as `String` or `[String]`.
+struct LightRAGKGNodeProperties: Sendable {
+    let description: String?
+    let keywords: String?
+    let resolvedEntityType: String?
+}
+
+extension LightRAGKGNodeProperties: Decodable {
+    private enum Keys: String, CodingKey {
+        case description
+        case keywords
+        case entityType = "entity_type"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        keywords = try c.decodeIfPresent(String.self, forKey: .keywords)
+        if let s = try? c.decode(String.self, forKey: .entityType) {
+            resolvedEntityType = s
+        } else if let a = try? c.decode([String].self, forKey: .entityType) {
+            resolvedEntityType = a.first
+        } else {
+            resolvedEntityType = nil
+        }
+    }
+}
+
+struct LightRAGKGEdgeDTO: Decodable, Sendable {
+    let source: String
+    let target: String
+    let properties: LightRAGKGEdgeProperties?
+}
+
+struct LightRAGKGEdgeProperties: Decodable, Sendable {
+    let description: String?
+    let keywords: String?
+}
+
+extension LightRAGKnowledgeGraphDTO {
+    func toGraphSearchResponse() -> GraphSearchResponse {
+        let mappedNodes = nodes.map { node in
+            GraphNodeData(
+                name: node.id,
+                type: node.properties?.resolvedEntityType ?? node.labels.first,
+                description: node.properties?.description,
+                degree: nil
+            )
+        }
+        let mappedEdges = edges.map { edge in
+            GraphEdgeData(
+                source: edge.source,
+                target: edge.target,
+                description: edge.properties?.description,
+                keywords: edge.properties?.keywords
+            )
+        }
+        return GraphSearchResponse(nodes: mappedNodes, edges: mappedEdges)
+    }
+}
+
 /// Structured query response with raw data
 public struct QueryDataResponse: Codable, Sendable {
     public let entities: [GraphNodeData]?
