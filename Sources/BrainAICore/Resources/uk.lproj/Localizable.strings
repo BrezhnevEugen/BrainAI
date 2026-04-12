@@ -213,3 +213,6 @@
 "app.menu.quick_search" = "Швидкий пошук";
 "app.menu.new_note" = "Нова нотатка";
 "app.menu.settings" = "Налаштування…";
+"app.menu.setup_wizard" = "Майстер початкового налаштування…";
+"app.menu.setup_wizard_missing_title" = "Інсталятор не знайдено";
+"app.menu.setup_wizard_missing_body" = "У цій копії BrainAI немає вбудованого інсталятора (потрібна збірка з DMG_SINGLE_APP=1). Скористайтеся повним образом DMG або запустіть BrainAI Installer з тієї ж теки, що й BrainAI.";

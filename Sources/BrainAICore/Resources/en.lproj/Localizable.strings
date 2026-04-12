@@ -214,3 +214,6 @@
 "app.menu.quick_search" = "Quick Search";
 "app.menu.new_note" = "New Note";
 "app.menu.settings" = "Settings…";
+"app.menu.setup_wizard" = "First-Time Setup Wizard…";
+"app.menu.setup_wizard_missing_title" = "Setup app not found";
+"app.menu.setup_wizard_missing_body" = "This copy of BrainAI does not include the installer inside the app bundle. Use the full disk image with DMG_SINGLE_APP=1, or run BrainAI Installer from the same folder as BrainAI.";

@@ -106,6 +106,7 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.quickSearch, action: #selector(quickSearch), key: "k"))
         brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.newNote, action: #selector(newNote), key: "n"))
         brainMenu.addItem(NSMenuItem.separator())
+        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.setupWizard, action: #selector(openSetupWizard), key: ""))
         brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.settings, action: #selector(openSettings), key: ","))
         mainMenu.addItem(brainItem)
 
@@ -115,7 +116,7 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
     private func makeMenuItem(title: String, action: Selector, key: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
-        item.keyEquivalentModifierMask = .command
+        item.keyEquivalentModifierMask = key.isEmpty ? [] : .command
         return item
     }
 
@@ -129,5 +130,15 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         NotificationCenter.default.post(name: .brainAIOpenSettings, object: nil)
+    }
+
+    @objc private func openSetupWizard() {
+        if BrainAIEmbeddedInstaller.openIfPresent() { return }
+        let alert = NSAlert()
+        alert.messageText = L10n.AppMenu.setupWizardMissingTitle
+        alert.informativeText = L10n.AppMenu.setupWizardMissingBody
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L10n.Common.ok)
+        alert.runModal()
     }
 }

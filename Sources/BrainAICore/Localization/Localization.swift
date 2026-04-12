@@ -189,6 +189,9 @@ public final class L10n: Sendable {
         public static var quickSearch: String { tr("app.menu.quick_search") }
         public static var newNote: String { tr("app.menu.new_note") }
         public static var settings: String { tr("app.menu.settings") }
+        public static var setupWizard: String { tr("app.menu.setup_wizard") }
+        public static var setupWizardMissingTitle: String { tr("app.menu.setup_wizard_missing_title") }
+        public static var setupWizardMissingBody: String { tr("app.menu.setup_wizard_missing_body") }
     }
 
     // MARK: - Chat
