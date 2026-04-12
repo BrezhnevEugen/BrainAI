@@ -10,6 +10,10 @@
 #   Из корня монорепо: ../scripts/build-and-sign.sh (см. обёртку; задайте DIST при необходимости)
 #   CODESIGN_IDENTITY="Developer ID Application: …" ./scripts/build-and-sign.sh
 #   NOTARIZE=1 NOTARY_KEYCHAIN_PROFILE=… ./scripts/build-and-sign.sh
+#
+# Optional DMG layout: all .app bundles inside one folder (single drag into /Applications):
+#   DMG_SUITE_FOLDER=1 ./scripts/build-and-sign.sh
+#   DMG_SUITE_FOLDER=1 DMG_SUITE_FOLDER_NAME="BrainAI" ./scripts/build-and-sign.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -55,6 +59,18 @@ mkdir -p "$STAGE"
 # Finder alias (optional, common DMG layout)
 ln -sf /Applications "$STAGE/Applications"
 
+# Flat (default): .app bundles sit next to "Applications". Suite: one subfolder so the user drags once.
+STAGE_APPS="$STAGE"
+if [[ "${DMG_SUITE_FOLDER:-0}" == "1" ]]; then
+  SUITE_NAME="${DMG_SUITE_FOLDER_NAME:-BrainAI}"
+  STAGE_APPS="$STAGE/$SUITE_NAME"
+  mkdir -p "$STAGE_APPS"
+  cat >"$STAGE_APPS/Перетащите-эту-папку.txt" <<'SUITE_README'
+Перетащите всю папку «BrainAI» (ту, где лежит этот файл) на ярлык «Программы» в окне DMG
+или в каталог /Applications. Внутри папки — все программы набора (основное приложение, трей, настройки, установщик).
+SUITE_README
+fi
+
 plist_set_string() {
   local plist="$1" key="$2" val="$3"
   if plutil -extract "$key" xml1 "$plist" >/dev/null 2>&1; then
@@ -90,7 +106,7 @@ assemble_app() {
   local src_macho="$4"
   local lsui="$5"
 
-  local app_path="$STAGE/$app_name"
+  local app_path="$STAGE_APPS/$app_name"
   mkdir -p "$app_path/Contents/MacOS"
 
   cp "$src_macho" "$app_path/Contents/MacOS/$exec_in_macos"
@@ -136,7 +152,7 @@ assemble_app "BrainAI Settings.app" "$BUNDLE_ID_PREFIX.settings" "BrainAISetting
 assemble_app "BrainAI Installer.app" "$BUNDLE_ID_PREFIX.installer" "BrainAIInstaller" "$BIN_DIR/BrainAIInstaller" "false"
 
 if [[ -f "$ROOT/README.md" ]]; then
-  cp "$ROOT/README.md" "$STAGE/README.txt"
+  cp "$ROOT/README.md" "$STAGE_APPS/README.txt"
 fi
 
 sign_if_needed() {
@@ -204,10 +220,10 @@ sign_app() {
 
 if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
   for app in \
-    "$STAGE/BrainAI.app" \
-    "$STAGE/BrainAI Tray.app" \
-    "$STAGE/BrainAI Settings.app" \
-    "$STAGE/BrainAI Installer.app"; do
+    "$STAGE_APPS/BrainAI.app" \
+    "$STAGE_APPS/BrainAI Tray.app" \
+    "$STAGE_APPS/BrainAI Settings.app" \
+    "$STAGE_APPS/BrainAI Installer.app"; do
     [[ -d "$app" ]] && sign_app "$app"
   done
 fi
