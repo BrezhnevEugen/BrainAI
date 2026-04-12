@@ -150,6 +150,34 @@ sign_if_needed() {
     "$target"
 }
 
+# Sparkle.framework ships nested helpers (Autoupdate, Updater.app, XPCServices).
+# Notarization requires each Mach-O to be Developer ID–signed with a secure timestamp;
+# signing only the outer .framework is not enough.
+sign_sparkle_framework() {
+  local fw="$1"
+  if [[ -z "${CODESIGN_IDENTITY:-}" ]] || [[ ! -d "$fw" ]]; then
+    return 0
+  fi
+  local tmp
+  tmp="$(mktemp -t brainai-sparkle-sign)"
+  # Longest paths first: binaries inside .xpc / .app before their bundles, Autoupdate last among innards.
+  find "$fw" -type f \( -path "*/Contents/MacOS/*" -o -path "*/Versions/*/Autoupdate" -o -path "*/Versions/*/Sparkle" \) 2>/dev/null \
+    | awk '{ print length, $0 }' | sort -rn | cut -d" " -f2- >"$tmp"
+  local f
+  while IFS= read -r f; do
+    [[ -n "$f" ]] && [[ -f "$f" ]] || continue
+    file "$f" 2>/dev/null | grep -q "Mach-O" || continue
+    sign_if_needed "$f"
+  done <"$tmp"
+  rm -f "$tmp"
+  # Re-sign nested .app bundles (e.g. Updater.app) after their executable.
+  local app_bundle
+  while IFS= read -r -d '' app_bundle; do
+    sign_if_needed "$app_bundle"
+  done < <(find "$fw" -name "*.app" -type d -print0 2>/dev/null)
+  sign_if_needed "$fw"
+}
+
 sign_app() {
   local app="$1"
   if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
@@ -158,7 +186,7 @@ sign_app() {
   local fw="$app/Contents/MacOS/Sparkle.framework"
   local rb="$app/Contents/MacOS/BrainAI_BrainAICore.bundle"
   local inst_rb="$app/Contents/MacOS/BrainAI_BrainAIInstaller.bundle"
-  [[ -d "$fw" ]] && sign_if_needed "$fw"
+  [[ -d "$fw" ]] && sign_sparkle_framework "$fw"
   [[ -d "$rb" ]] && sign_if_needed "$rb"
   [[ -d "$inst_rb" ]] && sign_if_needed "$inst_rb"
   # Sign each Mach-O inside MacOS (executable only; avoid re-signing framework copies)
