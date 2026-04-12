@@ -5,6 +5,7 @@
 # Local tooling (not shared)
 .cursor/
 .githooks/
+.history/
 
 # macOS
 .DS_Store

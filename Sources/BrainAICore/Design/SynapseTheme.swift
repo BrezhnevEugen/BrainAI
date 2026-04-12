@@ -4,40 +4,42 @@ import SwiftUI
 import AppKit
 #endif
 
-// MARK: - Colors (Synapse Graphite / Stitch reference)
+// MARK: - Colors (native macOS semantic)
 
-/// Design tokens aligned with **Synapse Graphite** (Stitch *BrainAI macOS — Neural Knowledge UI 2026*).
+/// Design tokens using macOS system-semantic colors.
+/// Follows the user's Light / Dark appearance automatically.
 public enum SynapseColor {
-    public static let surface = Color(red: 19 / 255, green: 19 / 255, blue: 25 / 255)
-    public static let surfaceContainerLow = Color(red: 27 / 255, green: 27 / 255, blue: 33 / 255)
-    public static let surfaceContainer = Color(red: 31 / 255, green: 31 / 255, blue: 37 / 255)
-    public static let surfaceContainerHigh = Color(red: 42 / 255, green: 41 / 255, blue: 48 / 255)
-    public static let surfaceContainerHighest = Color(red: 52 / 255, green: 52 / 255, blue: 59 / 255)
-    public static let surfaceContainerLowest = Color(red: 14 / 255, green: 14 / 255, blue: 20 / 255)
-    public static let surfaceVariant = Color(red: 52 / 255, green: 52 / 255, blue: 59 / 255)
+    // MARK: Surfaces — follow system window / control backgrounds
+    public static let surface = Color(nsColor: .windowBackgroundColor)
+    public static let surfaceContainerLow = Color(nsColor: .controlBackgroundColor)
+    public static let surfaceContainer = Color(nsColor: .underPageBackgroundColor)
+    public static let surfaceContainerHigh = Color(nsColor: .controlBackgroundColor)
+    public static let surfaceContainerHighest = Color(nsColor: .textBackgroundColor)
+    public static let surfaceContainerLowest = Color(nsColor: .windowBackgroundColor)
+    public static let surfaceVariant = Color.secondary.opacity(0.08)
 
-    public static let onSurface = Color(red: 228 / 255, green: 225 / 255, blue: 234 / 255)
-    public static let onSurfaceVariant = Color(red: 194 / 255, green: 198 / 255, blue: 214 / 255)
+    // MARK: Text
+    public static let onSurface = Color.primary
+    public static let onSurfaceVariant = Color.secondary
 
-    public static let primary = Color(red: 175 / 255, green: 198 / 255, blue: 255 / 255)
-    public static let primaryContainer = Color(red: 82 / 255, green: 141 / 255, blue: 255 / 255)
-    public static let secondary = Color(red: 208 / 255, green: 188 / 255, blue: 255 / 255)
-    public static let tertiary = Color(red: 123 / 255, green: 209 / 255, blue: 250 / 255)
+    // MARK: Accent
+    public static let primary = Color.accentColor
+    public static let primaryContainer = Color.accentColor
+    public static let secondary = Color.purple
+    public static let tertiary = Color.teal
 
-    public static let outlineVariant = Color(red: 66 / 255, green: 71 / 255, blue: 83 / 255)
-    public static let error = Color(red: 255 / 255, green: 180 / 255, blue: 171 / 255)
+    // MARK: Borders & errors
+    public static let outlineVariant = Color(nsColor: .separatorColor)
+    public static let error = Color.red
 
-    /// Text on primary CTA / gradient (Stitch `on-primary-fixed` `#001a43`).
-    public static let onPrimaryFixed = Color(red: 0, green: 26 / 255, blue: 67 / 255)
-    public static let secondaryContainer = Color(red: 87 / 255, green: 27 / 255, blue: 193 / 255)
+    public static let onPrimaryFixed = Color.white
+    public static let secondaryContainer = Color.purple.opacity(0.15)
 
-    /// Stitch sidebar row highlight tint (`#4F8CFF` at ~10% fill).
-    public static let sidebarSelectionFill = Color(red: 79 / 255, green: 140 / 255, blue: 255 / 255)
+    public static let sidebarSelectionFill = Color.accentColor
 
     #if canImport(AppKit)
-    /// Matches `surface` for SpriteKit / AppKit scenes.
     public static var graphBackgroundNSColor: NSColor {
-        NSColor(red: 19 / 255, green: 19 / 255, blue: 25 / 255, alpha: 1)
+        .windowBackgroundColor
     }
     #endif
 }
@@ -52,10 +54,10 @@ public enum SynapseLayout {
 // MARK: - Gradients
 
 public enum SynapseStyle {
-    /// Stitch `.synapse-gradient`: 135° from `#528DFF` → `#D0BCFF`.
+    /// Accent gradient for CTA buttons.
     public static var primaryCTAGradient: LinearGradient {
         LinearGradient(
-            colors: [SynapseColor.primaryContainer, SynapseColor.secondary],
+            colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -104,78 +106,56 @@ public struct SynapseToolbarStripModifier: ViewModifier {
 
     public func body(content: Content) -> some View {
         content
-            .background {
-                ZStack {
-                    Rectangle().fill(.ultraThinMaterial)
-                    Rectangle().fill(SynapseColor.surfaceVariant.opacity(0.22))
-                }
-            }
+            .background(.bar)
     }
 }
 
 extension View {
-    /// Main window / detail column background (`#131319`).
+    /// Main window / detail column background.
     public func synapseRootBackground() -> some View {
-        background(SynapseColor.surface)
+        background(Color(nsColor: .windowBackgroundColor))
     }
 
-    /// Sidebar column (`surface_container_low`).
+    /// Sidebar column.
     public func synapseSidebarChrome() -> some View {
-        background(SynapseColor.surfaceContainerLow)
+        background(.clear)
     }
 
-    /// Stitch aside: `bg-surface/80` + `backdrop-blur-xl` + trailing hairline.
+    /// Sidebar background — transparent to let system vibrancy show.
     public func synapseStitchSidebar() -> some View {
-        background {
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Rectangle().fill(SynapseColor.surface.opacity(0.45))
-            }
-        }
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(SynapseColor.outlineVariant.opacity(0.2))
-                .frame(width: 1)
-        }
+        background(.clear)
     }
 
-    /// Stitch `.glass-panel`: `surface-variant` @ 60% + heavy blur.
+    /// Glass panel with subtle material.
     public func synapseGlassPanel(cornerRadius: CGFloat = SynapseLayout.cardCornerRadius) -> some View {
-        background {
-            ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(SynapseColor.surfaceVariant.opacity(0.6))
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            }
-        }
+        background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
-    /// Dashboard metric tile: `surface_container_low` + ghost border (Stitch bento).
+    /// Metric card — grouped inset style.
     public func synapseMetricCard(cornerRadius: CGFloat = SynapseLayout.cardCornerRadius) -> some View {
         background(
-            SynapseColor.surfaceContainerLow,
+            Color(nsColor: .controlBackgroundColor),
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
         )
     }
 
-    /// Card: raised surface + ghost border (1pt ~20% outline).
+    /// Card: raised surface.
     public func synapseCardSurface(cornerRadius: CGFloat = SynapseLayout.cardCornerRadius) -> some View {
         background(
-            SynapseColor.surfaceContainerHigh,
+            Color(nsColor: .controlBackgroundColor),
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
         )
     }
 
-    /// Toolbar / header strip: material + Synapse tint.
+    /// Toolbar / header strip.
     public func synapseToolbarStrip() -> some View {
         modifier(SynapseToolbarStripModifier())
     }
@@ -186,36 +166,32 @@ extension View {
 public struct SynapseSidebarBrandHeader: View {
     private let horizontalPadding: CGFloat
 
-    public init(horizontalPadding: CGFloat = 24) {
+    public init(horizontalPadding: CGFloat = 16) {
         self.horizontalPadding = horizontalPadding
     }
 
     public var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(SynapseStyle.primaryCTAGradient)
-                    .frame(width: 32, height: 32)
-                Image(systemName: "network")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(SynapseColor.onPrimaryFixed)
-            }
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(.tint)
+                .frame(width: 28, height: 28)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(L10n.Common.appName)
-                    .font(SynapseTypography.brandTitle())
-                    .foregroundStyle(SynapseColor.onSurface)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
                 Text(L10n.Common.brandTagline)
-                    .font(SynapseTypography.brandTagline())
-                    .foregroundStyle(SynapseColor.onSurfaceVariant)
-                    .tracking(1)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+                    .tracking(0.5)
             }
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, horizontalPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 }

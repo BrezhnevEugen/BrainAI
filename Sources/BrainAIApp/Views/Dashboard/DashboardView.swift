@@ -253,12 +253,11 @@ struct DashboardView: View {
 
             if viewModel.isLoading {
                 ProgressView()
-                    .scaleEffect(1.5)
+                    .controlSize(.large)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(SynapseColor.surface.opacity(0.45))
+                    .background(.ultraThinMaterial)
             }
         }
-        .background(SynapseColor.surface)
         .task {
             await Task.yield()
             await viewModel.loadData()
@@ -639,16 +638,9 @@ private struct DashboardOverviewChrome: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
-        .background {
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Rectangle().fill(SynapseColor.surface.opacity(0.52))
-            }
-        }
+        .background(.bar)
         .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(SynapseColor.outlineVariant.opacity(0.12))
-                .frame(height: 1)
+            Divider()
         }
     }
 
