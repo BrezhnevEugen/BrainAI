@@ -179,14 +179,16 @@ struct NotesView: View {
                 .frame(minWidth: 250, maxWidth: 350)
 
             Divider()
+                .background(SynapseColor.outlineVariant.opacity(0.25))
 
             // Right pane: Editor
             editorPane
         }
+        .synapseRootBackground()
         .task {
             viewModel.loadNotes()
         }
-        .navigationTitle("Notes")
+        .navigationTitle(L10n.Nav.notes)
     }
 
     // MARK: - Left Pane: Notes List
@@ -196,22 +198,27 @@ struct NotesView: View {
             // Search field
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 TextField("Search notes...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
+                    .foregroundStyle(SynapseColor.onSurface)
 
                 if !viewModel.searchText.isEmpty {
                     Button(action: { viewModel.searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(SynapseColor.onSurfaceVariant)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(8)
-            .background(Color(.controlBackgroundColor))
-            .cornerRadius(6)
+            .background(SynapseColor.surfaceContainerHigh)
+            .clipShape(RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
+                    .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+            )
             .padding(12)
 
             // New note button
@@ -223,14 +230,14 @@ struct NotesView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(8)
-                .foregroundColor(.white)
-                .background(Color.blue)
-                .cornerRadius(6)
+                .foregroundStyle(.white)
+                .background(SynapseStyle.primaryCTAGradient, in: RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(12)
 
             Divider()
+                .background(SynapseColor.outlineVariant.opacity(0.2))
 
             // Notes list
             List(selection: $viewModel.selectedNoteID) {
@@ -247,7 +254,9 @@ struct NotesView: View {
                 }
             }
             .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
         }
+        .background(SynapseColor.surfaceContainerLow)
     }
 
     // MARK: - Note Row
@@ -266,7 +275,7 @@ struct NotesView: View {
                 if note.isSynced {
                     Image(systemName: "checkmark.icloud.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(.blue)
+                        .foregroundStyle(SynapseColor.primary)
                 }
             }
 
@@ -275,14 +284,14 @@ struct NotesView: View {
             if !preview.isEmpty {
                 Text(preview)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
                     .lineLimit(1)
             }
 
             // Date
             Text(note.updatedAt.formatted(date: .abbreviated, time: .omitted))
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
         }
         .padding(.vertical, 4)
     }
@@ -304,18 +313,18 @@ struct NotesView: View {
         VStack(spacing: 16) {
             Image(systemName: "note.text")
                 .font(.system(size: 48))
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
 
             Text("Select or create a note")
                 .font(.title3)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurface)
 
             Text("Create a new note to get started")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.controlBackgroundColor))
+        .synapseRootBackground()
     }
 
     // MARK: - Editor Content
@@ -334,6 +343,7 @@ struct NotesView: View {
             ))
             .font(.system(size: 24, weight: .bold, design: .default))
             .lineLimit(2)
+            .foregroundStyle(SynapseColor.onSurface)
             .padding(.horizontal, 16)
             .padding(.top, 16)
 
@@ -369,7 +379,14 @@ struct NotesView: View {
             ))
             .font(.system(.body, design: .monospaced))
             .scrollContentBackground(.hidden)
-            .background(Color(.textBackgroundColor))
+            .padding(8)
+            .background(SynapseColor.surfaceContainerLowest)
+            .clipShape(RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
+                    .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
 
             Divider()
 
@@ -378,7 +395,7 @@ struct NotesView: View {
                 // Word count
                 Text("\(wordCount(note)) words")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 Spacer()
 
@@ -386,7 +403,7 @@ struct NotesView: View {
                 if let error = viewModel.insertionError {
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.red)
+                        .foregroundStyle(SynapseColor.error)
                 }
 
                 // Synced indicator
@@ -409,7 +426,7 @@ struct NotesView: View {
                 // Last updated timestamp
                 Text(note.updatedAt.formatted(date: .omitted, time: .shortened))
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 Spacer()
 
@@ -422,6 +439,7 @@ struct NotesView: View {
                     .font(.caption)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(SynapseColor.primaryContainer)
                 .disabled(viewModel.isInserting || note.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 if viewModel.isInserting {
@@ -431,7 +449,7 @@ struct NotesView: View {
             }
             .padding(12)
         }
-        .background(Color(.controlBackgroundColor))
+        .synapseRootBackground()
     }
 
     // MARK: - Tag Capsule

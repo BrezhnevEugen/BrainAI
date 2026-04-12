@@ -246,7 +246,9 @@ struct ServerTab: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Server")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.server)
         .onAppear { refreshStatuses() }
     }
 

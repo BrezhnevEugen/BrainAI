@@ -18,6 +18,10 @@
 "common.next" = "Далее";
 "common.copy" = "Копировать";
 "common.share" = "Поделиться";
+"common.brand_tagline" = "Нейроархив";
+
+/* Chrome (Stitch main window top bar) */
+"chrome.archive_search_placeholder" = "Поиск в архиве…";
 
 /* Navigation */
 "nav.dashboard" = "Главная";
@@ -26,6 +30,7 @@
 "nav.search" = "Поиск";
 "nav.notes" = "Заметки";
 "nav.graph" = "Граф знаний";
+"nav.settings" = "Настройки";
 
 /* Chat */
 "chat.placeholder" = "Задайте вопрос...";
@@ -129,3 +134,82 @@
 "errors.server_unavailable" = "Сервер недоступен";
 "errors.decoding" = "Ошибка формата данных";
 "errors.unknown" = "Произошла непредвиденная ошибка";
+
+/* Dashboard */
+"dashboard.hero_title" = "Пульс архива";
+"dashboard.hero_subtitle" = "Граф знаний и сервисы активны.";
+"dashboard.export_graph" = "Экспорт графа";
+"dashboard.new_entry" = "Новая запись";
+"dashboard.overview" = "Обзор";
+"dashboard.active_workspace" = "Активное рабочее пространство";
+"dashboard.service_status" = "Состояние сервисов";
+"dashboard.recent_activity" = "Недавняя активность";
+"dashboard.quick_actions" = "Быстрые действия";
+"dashboard.provider_roles" = "Роли провайдеров";
+"dashboard.workspace.none" = "Нет рабочего пространства";
+"dashboard.workspace.active" = "Активно";
+"dashboard.workspace.inactive" = "Неактивно";
+"dashboard.service.running" = "Работает";
+"dashboard.service.stopped" = "Остановлено";
+"dashboard.service.error" = "Ошибка";
+"dashboard.service.unknown" = "Неизвестно";
+"dashboard.stat.entities" = "Сущности";
+"dashboard.stat.relations" = "Связи";
+"dashboard.stat.documents" = "Документы";
+"dashboard.stat.workspaces" = "Пространства";
+"dashboard.quick_search_placeholder" = "Быстрый поиск…";
+"dashboard.action.new_note" = "Новая заметка";
+"dashboard.action.insert_document" = "Добавить документ";
+"dashboard.action.ask_question" = "Задать вопрос";
+"dashboard.action.browse_graph" = "Открыть граф";
+"dashboard.activity.document_inserted" = "Документ добавлен";
+"dashboard.activity.query_executed" = "Выполнен запрос";
+"dashboard.activity.sample_ml" = "Научная статья по ML";
+"dashboard.activity.sample_transformers" = "Что такое трансформеры?";
+"dashboard.activity.sample_report" = "Годовой отчёт 2024";
+"dashboard.activity.sample_summarize" = "Кратко выделить выводы";
+"dashboard.time.just_now" = "Только что";
+"dashboard.time.minutes_ago" = "%d мин назад";
+"dashboard.time.hours_ago" = "%d ч назад";
+"dashboard.time.days_ago" = "%d дн назад";
+"dashboard.service_name.ollama" = "Ollama";
+"dashboard.service_name.lightrag" = "LightRAG";
+
+"dashboard.chrome.overview" = "Обзор";
+"dashboard.chrome.ollama_on" = "Ollama: активен";
+"dashboard.chrome.ollama_off" = "Ollama: выкл.";
+"dashboard.chrome.lightrag_on" = "LightRAG: активен";
+"dashboard.chrome.lightrag_off" = "LightRAG: выкл.";
+"dashboard.chrome.new_chat" = "Новый чат";
+"dashboard.chrome.index_folder" = "Индексировать папку";
+"dashboard.metric.tag.total" = "Всего";
+"dashboard.metric.tag.linked" = "Связей";
+"dashboard.metric.tag.stored" = "В хранилище";
+"dashboard.metric.tag.active" = "Активно";
+"dashboard.metric.caption.entities" = "Сущности проиндексированы";
+"dashboard.metric.caption.relations" = "Нейросвязи";
+"dashboard.metric.caption.documents" = "Локальные документы";
+"dashboard.metric.caption.workspaces" = "Рабочие пространства";
+"dashboard.workspace.section_active" = "Активное рабочее пространство";
+"dashboard.workspace.resume" = "Продолжить";
+"dashboard.workspace.settings_link" = "Настройки пространства";
+"dashboard.workspace.blurb" = "Анализ локальных репозиториев. Держите сервисы запущенными для синхронизации графа знаний.";
+"dashboard.workspace.blurb_empty" = "Выберите или создайте рабочее пространство в настройках, чтобы индексировать документы.";
+"dashboard.activity.view_full_log" = "Полный журнал";
+"dashboard.footer.e2e" = "Сквозное шифрование";
+"dashboard.footer.local_inference" = "Локальный инференс";
+"dashboard.footer.sqlite" = "SQLite";
+"dashboard.time.short_minutes" = "%dМ НАЗАД";
+"dashboard.time.short_hours" = "%dЧ НАЗАД";
+"sidebar.local_instance" = "Локальный экземпляр";
+"dashboard.role.embedding" = "Эмбеддинг";
+"dashboard.role.extraction" = "Извлечение";
+"dashboard.role.reranking" = "Реранжирование";
+"dashboard.role.generation" = "Генерация";
+
+/* Main menu */
+"app.menu.quit" = "Завершить BrainAI";
+"app.menu.section" = "BrainAI";
+"app.menu.quick_search" = "Быстрый поиск";
+"app.menu.new_note" = "Новая заметка";
+"app.menu.settings" = "Настройки…";

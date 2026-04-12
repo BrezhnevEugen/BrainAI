@@ -110,7 +110,9 @@ struct AdvancedTab: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Advanced")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.advanced)
         .confirmationDialog(
             "Reset Settings",
             isPresented: $showResetConfirmation

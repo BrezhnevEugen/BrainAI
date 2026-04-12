@@ -1,47 +1,42 @@
+import AppKit
 import SwiftUI
+import Observation
+import Foundation
 import BrainAICore
+
+// MARK: - LightRAG health (machine state, localized labels applied on MainActor)
+
+private enum LightRAGHealth: Sendable {
+    case running
+    case errorResponse
+    case unreachable
+}
 
 // MARK: - Dashboard ViewModel
 
-/// ViewModel for Dashboard screen with real-time data.
-/// Network I/O runs off the main actor so the UI stays responsive (avoids “application not responding”).
 @Observable
 final class DashboardViewModel: @unchecked Sendable {
-    // MARK: - Stats
-
     var entitiesCount: Int = 0
     var relationsCount: Int = 0
     var documentsCount: Int = 0
     var activeWorkspacesCount: Int = 0
 
-    // MARK: - Service Status
+    var ollamaStatus: ServiceStatusInfo = ServiceStatusInfo(isRunning: false, statusText: L10n.Dashboard.serviceUnknown)
+    var lightRAGStatus: ServiceStatusInfo = ServiceStatusInfo(isRunning: false, statusText: L10n.Dashboard.serviceUnknown)
 
-    var ollamaStatus: ServiceStatusInfo = ServiceStatusInfo(isRunning: false, statusText: "Unknown")
-    var lightRAGStatus: ServiceStatusInfo = ServiceStatusInfo(isRunning: false, statusText: "Unknown")
-
-    // MARK: - Active Workspace
-
-    var activeWorkspaceName: String = "No Workspace"
-    var activeWorkspaceStatus: String = "Inactive"
+    var activeWorkspaceName: String = L10n.Dashboard.workspaceNone
+    var isWorkspaceActive: Bool = false
     var providerRoles: [String] = []
-
-    // MARK: - Recent Activity
 
     var recentActivities: [ActivityItem] = []
 
-    // MARK: - Loading States
-
     var isLoading: Bool = false
     var errorMessage: String?
-
-    // MARK: - Dependencies
 
     private let lightRAGClient: LocalLightRAGClient
     private let ollamaClient: OllamaAPIClient
     private let workspaceManager: WorkspaceManager?
     private let config: AppConfiguration
-
-    // MARK: - Initialization
 
     init(
         lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(requestTimeout: 3),
@@ -55,9 +50,6 @@ final class DashboardViewModel: @unchecked Sendable {
         self.config = config
     }
 
-    // MARK: - Data Loading
-
-    /// Load dashboard data
     func loadData() async {
         await MainActor.run {
             isLoading = true
@@ -79,28 +71,36 @@ final class DashboardViewModel: @unchecked Sendable {
             let l = await lightStatus
             let s = await stats
             let workspaceUI = Self.workspaceFields(from: activeWorkspace)
-            let recent = Self.placeholderRecentActivities()
 
-            return (
-                ollama: ServiceStatusInfo(isRunning: o, statusText: o ? "Running" : "Stopped"),
-                lightRAG: l,
-                stats: s,
-                workspaceUI: workspaceUI,
-                recent: recent
-            )
+            return (ollamaRunning: o, lightRAG: l, stats: s, workspaceUI: workspaceUI)
         }.value
 
         await MainActor.run {
-            ollamaStatus = refresh.ollama
-            lightRAGStatus = refresh.lightRAG
+            ollamaStatus = ServiceStatusInfo(
+                isRunning: refresh.ollamaRunning,
+                statusText: refresh.ollamaRunning ? L10n.Dashboard.serviceRunning : L10n.Dashboard.serviceStopped
+            )
+            let lrText: String
+            switch refresh.lightRAG {
+            case .running:
+                lrText = L10n.Dashboard.serviceRunning
+            case .errorResponse:
+                lrText = L10n.Dashboard.serviceError
+            case .unreachable:
+                lrText = L10n.Dashboard.serviceStopped
+            }
+            lightRAGStatus = ServiceStatusInfo(
+                isRunning: refresh.lightRAG == .running,
+                statusText: lrText
+            )
             entitiesCount = refresh.stats.entities
             relationsCount = refresh.stats.relations
             documentsCount = refresh.stats.documents
             activeWorkspacesCount = refresh.stats.workspaces
-            activeWorkspaceName = refresh.workspaceUI.name
-            activeWorkspaceStatus = refresh.workspaceUI.status
+            activeWorkspaceName = refresh.workspaceUI.name ?? L10n.Dashboard.workspaceNone
+            isWorkspaceActive = refresh.workspaceUI.isActive
             providerRoles = refresh.workspaceUI.roles
-            recentActivities = refresh.recent
+            recentActivities = Self.placeholderRecentActivities()
             isLoading = false
         }
     }
@@ -113,13 +113,13 @@ final class DashboardViewModel: @unchecked Sendable {
         }
     }
 
-    private nonisolated static func fetchLightRAGHealth(_ client: LocalLightRAGClient) async -> ServiceStatusInfo {
+    private nonisolated static func fetchLightRAGHealth(_ client: LocalLightRAGClient) async -> LightRAGHealth {
         do {
             let response = try await client.healthCheck()
             let ok = response.status.lowercased() == "ok"
-            return ServiceStatusInfo(isRunning: ok, statusText: ok ? "Running" : "Error")
+            return ok ? .running : .errorResponse
         } catch {
-            return ServiceStatusInfo(isRunning: false, statusText: "Stopped")
+            return .unreachable
         }
     }
 
@@ -140,48 +140,42 @@ final class DashboardViewModel: @unchecked Sendable {
         }
     }
 
-    private nonisolated static func workspaceFields(from workspace: Workspace?) -> (name: String, status: String, roles: [String]) {
+    private nonisolated static func workspaceFields(from workspace: Workspace?) -> (name: String?, isActive: Bool, roles: [String]) {
         guard let workspace else {
-            return ("No Workspace", "Inactive", [])
+            return (nil, false, [])
         }
 
         var roles: [String] = []
-        if workspace.embeddingRole != nil { roles.append("Embedding") }
-        if workspace.extractionRole != nil { roles.append("Extraction") }
-        if workspace.rerankerRole != nil { roles.append("Reranking") }
-        if workspace.generationRole != nil { roles.append("Generation") }
+        if workspace.embeddingRole != nil { roles.append("embedding") }
+        if workspace.extractionRole != nil { roles.append("extraction") }
+        if workspace.rerankerRole != nil { roles.append("reranking") }
+        if workspace.generationRole != nil { roles.append("generation") }
         if roles.isEmpty {
-            roles = ["Embedding", "Extraction", "Generation"]
+            roles = ["embedding", "extraction", "generation"]
         }
-        return (workspace.name, "Active", roles)
+        return (workspace.name, true, roles)
     }
 
-    private nonisolated static func placeholderRecentActivities() -> [ActivityItem] {
+    private static func placeholderRecentActivities() -> [ActivityItem] {
         let now = Date()
         return [
             ActivityItem(
                 type: .documentInserted,
-                title: "Document inserted",
-                description: "Research Paper on ML",
+                title: L10n.Dashboard.activityDocumentInserted,
+                description: L10n.Dashboard.activitySampleML,
                 timestamp: now.addingTimeInterval(-3600)
             ),
             ActivityItem(
                 type: .query,
-                title: "Query executed",
-                description: "What are transformer models?",
+                title: L10n.Dashboard.activityQueryExecuted,
+                description: L10n.Dashboard.activitySampleTransformers,
                 timestamp: now.addingTimeInterval(-7200)
             ),
             ActivityItem(
                 type: .documentInserted,
-                title: "Document inserted",
-                description: "Annual Report 2024",
+                title: L10n.Dashboard.activityDocumentInserted,
+                description: L10n.Dashboard.activitySampleReport,
                 timestamp: now.addingTimeInterval(-10800)
-            ),
-            ActivityItem(
-                type: .query,
-                title: "Query executed",
-                description: "Summarize key findings",
-                timestamp: now.addingTimeInterval(-14400)
             )
         ]
     }
@@ -209,389 +203,578 @@ struct ActivityItem: Identifiable, Sendable {
     let timestamp: Date
 }
 
-// MARK: - Dashboard View
+// MARK: - Dashboard View (reference layout: overview chrome + bento + workspace / activity + footer)
 
 struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
+    @Bindable private var config = AppConfiguration.shared
+    @State private var headerSearchQuery = ""
 
     var body: some View {
         ZStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Stats Cards
-                    statsCardsSection
+            VStack(spacing: 0) {
+                DashboardOverviewChrome(
+                    ollamaRunning: viewModel.ollamaStatus.isRunning,
+                    lightRAGRunning: viewModel.lightRAGStatus.isRunning,
+                    searchText: $headerSearchQuery,
+                    onRefresh: {
+                        Task { await viewModel.loadData() }
+                    },
+                    onNewChat: {
+                        NotificationCenter.default.post(name: .brainAINewChat, object: nil)
+                    },
+                    onIndexFolder: { pickIndexFolder() },
+                    onSearchSubmit: {
+                        NotificationCenter.default.post(name: .brainAIOpenSearch, object: nil)
+                    }
+                )
 
-                    // Active Workspace Info
-                    activeWorkspaceSection
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        metricsRow
 
-                    // Service Status
-                    serviceStatusSection
+                        HStack(alignment: .top, spacing: 16) {
+                            workspaceHeroCard
+                                .frame(maxWidth: .infinity, minHeight: 240, alignment: .topLeading)
+                                .layoutPriority(2)
 
-                    // Recent Activity
-                    recentActivitySection
+                            activityColumn
+                                .frame(minWidth: 260, idealWidth: 300, maxWidth: 340, alignment: .topLeading)
+                                .layoutPriority(1)
+                        }
 
-                    // Quick Actions
-                    quickActionsSection
-
-                    Spacer()
+                        footerStatusPills
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.top, 20)
+                    .padding(.bottom, 28)
                 }
-                .padding()
             }
 
-            // Loading overlay
             if viewModel.isLoading {
                 ProgressView()
                     .scaleEffect(1.5)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.1))
+                    .background(SynapseColor.surface.opacity(0.45))
             }
         }
+        .background(SynapseColor.surface)
         .task {
             await Task.yield()
             await viewModel.loadData()
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle("")
+        .id(config.language)
     }
 
-    // MARK: - Stats Cards Section
+    // MARK: - Metrics (4 tiles: icon | tag, value, caption)
 
-    private var statsCardsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Overview")
-                .font(.headline)
-                .padding(.horizontal, 4)
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
-                spacing: 12
-            ) {
-                StatCard(
-                    icon: "sum",
-                    value: viewModel.entitiesCount,
-                    label: "Entities"
-                )
-
-                StatCard(
-                    icon: "arrow.up.arrow.down",
-                    value: viewModel.relationsCount,
-                    label: "Relations"
-                )
-
-                StatCard(
-                    icon: "doc.text",
-                    value: viewModel.documentsCount,
-                    label: "Documents"
-                )
-
-                StatCard(
-                    icon: "square.grid.2x2",
-                    value: viewModel.activeWorkspacesCount,
-                    label: "Workspaces"
-                )
-            }
+    private var metricsRow: some View {
+        HStack(spacing: 14) {
+            OverviewMetricTile(
+                icon: "cylinder.split.1x2",
+                iconTint: SynapseColor.primary,
+                tag: L10n.Dashboard.metricTagTotal,
+                value: formatMetric(viewModel.entitiesCount),
+                caption: L10n.Dashboard.metricCaptionEntities
+            )
+            OverviewMetricTile(
+                icon: "point.3.connected.trianglepath.dotted",
+                iconTint: SynapseColor.secondary,
+                tag: L10n.Dashboard.metricTagLinked,
+                value: formatMetric(viewModel.relationsCount),
+                caption: L10n.Dashboard.metricCaptionRelations
+            )
+            OverviewMetricTile(
+                icon: "doc.text",
+                iconTint: SynapseColor.tertiary,
+                tag: L10n.Dashboard.metricTagStored,
+                value: formatMetric(viewModel.documentsCount),
+                caption: L10n.Dashboard.metricCaptionDocuments
+            )
+            OverviewMetricTile(
+                icon: "square.grid.2x2",
+                iconTint: SynapseColor.primaryContainer,
+                tag: L10n.Dashboard.metricTagActive,
+                value: formatMetric(viewModel.activeWorkspacesCount),
+                caption: L10n.Dashboard.metricCaptionWorkspaces
+            )
         }
     }
 
-    // MARK: - Active Workspace Section
+    // MARK: - Workspace hero (~2/3 reference)
 
-    private var activeWorkspaceSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Active Workspace")
-                .font(.headline)
-                .padding(.horizontal, 4)
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.activeWorkspaceName)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(viewModel.activeWorkspaceStatus == "Active" ? Color.green : Color.gray)
-                                .frame(width: 8, height: 8)
-
-                            Text(viewModel.activeWorkspaceStatus)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+    private var workspaceHeroCard: some View {
+        ZStack(alignment: .trailing) {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        Text(L10n.Dashboard.workspaceSectionActive.uppercased())
+                            .font(.system(size: 10, weight: .bold, design: .default))
+                            .tracking(0.9)
+                            .foregroundStyle(SynapseColor.onSurfaceVariant)
+                        Circle()
+                            .fill(viewModel.isWorkspaceActive ? Color.green : SynapseColor.outlineVariant)
+                            .frame(width: 7, height: 7)
                     }
 
-                    Spacer()
+                    Text(viewModel.activeWorkspaceName)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(SynapseColor.onSurface)
+                        .lineLimit(2)
+
+                    Text(viewModel.isWorkspaceActive ? L10n.Dashboard.workspaceBlurb : L10n.Dashboard.workspaceBlurbEmpty)
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .foregroundStyle(SynapseColor.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .lineSpacing(3)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            NotificationCenter.default.post(name: .brainAIOpenGraph, object: nil)
+                        } label: {
+                            Text(L10n.Dashboard.workspaceResume)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 9)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SynapseColor.onSurface)
+                        .background(SynapseColor.surfaceContainerHigh)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(SynapseColor.outlineVariant.opacity(0.25), lineWidth: 1)
+                        )
+
+                        Button {
+                            BrainAICompanionAppLauncher.openSettings()
+                        } label: {
+                            Text(L10n.Dashboard.workspaceSettingsLink)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SynapseColor.primary)
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 4)
                 }
+                .padding(22)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                if !viewModel.providerRoles.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Provider Roles")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                workspaceNeuralGraphic
+                    .frame(width: 200)
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 12)
+                    .allowsHitTesting(false)
+            }
+        }
+        .background(SynapseColor.surfaceContainerLow)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(SynapseColor.outlineVariant.opacity(0.22), lineWidth: 1)
+        )
+    }
 
-                        HStack(spacing: 8) {
-                            ForEach(viewModel.providerRoles, id: \.self) { role in
-                                Text(role)
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.blue.opacity(0.15))
-                                    .cornerRadius(4)
-                            }
-
-                            Spacer()
+    private var workspaceNeuralGraphic: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    SynapseColor.primaryContainer.opacity(0.12),
+                    SynapseColor.secondary.opacity(0.08),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Canvas { context, size in
+                let nodes: [CGPoint] = [
+                    CGPoint(x: size.width * 0.25, y: size.height * 0.35),
+                    CGPoint(x: size.width * 0.55, y: size.height * 0.22),
+                    CGPoint(x: size.width * 0.78, y: size.height * 0.48),
+                    CGPoint(x: size.width * 0.42, y: size.height * 0.72),
+                    CGPoint(x: size.width * 0.68, y: size.height * 0.78)
+                ]
+                var path = Path()
+                for i in 0..<nodes.count {
+                    for j in (i + 1)..<nodes.count {
+                        if (i + j) % 2 == 0 {
+                            path.move(to: nodes[i])
+                            path.addLine(to: nodes[j])
                         }
                     }
                 }
-            }
-            .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(8)
-        }
-    }
-
-    // MARK: - Service Status Section
-
-    private var serviceStatusSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Service Status")
-                .font(.headline)
-                .padding(.horizontal, 4)
-
-            HStack(spacing: 20) {
-                ServiceStatusView(
-                    name: "Ollama",
-                    isRunning: viewModel.ollamaStatus.isRunning,
-                    statusText: viewModel.ollamaStatus.statusText
+                context.stroke(
+                    path,
+                    with: .color(SynapseColor.primary.opacity(0.28)),
+                    lineWidth: 1
                 )
-
-                ServiceStatusView(
-                    name: "LightRAG",
-                    isRunning: viewModel.lightRAGStatus.isRunning,
-                    statusText: viewModel.lightRAGStatus.statusText
-                )
-
-                Spacer()
+                for p in nodes {
+                    let r: CGFloat = 4
+                    context.fill(
+                        Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
+                        with: .color(SynapseColor.secondary.opacity(0.55))
+                    )
+                }
             }
         }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    // MARK: - Recent Activity Section
+    // MARK: - Activity column (~1/3)
 
-    private var recentActivitySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Activity")
-                .font(.headline)
-                .padding(.horizontal, 4)
+    private var activityColumn: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "clock")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
+                Text(L10n.Dashboard.recentActivity)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(SynapseColor.onSurface)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
 
             VStack(spacing: 0) {
-                ForEach(viewModel.recentActivities.prefix(5)) { activity in
-                    ActivityRow(activity: activity)
-
-                    if activity.id != viewModel.recentActivities.last?.id {
+                ForEach(Array(viewModel.recentActivities.enumerated()), id: \.element.id) { index, activity in
+                    DashboardActivityCompactRow(activity: activity, shortTime: shortRelativeTime(activity.timestamp))
+                    if index < viewModel.recentActivities.count - 1 {
                         Divider()
-                            .padding(.vertical, 8)
+                            .background(SynapseColor.outlineVariant.opacity(0.15))
+                            .padding(.leading, 52)
                     }
                 }
             }
-            .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(8)
-        }
-    }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
 
-    // MARK: - Quick Actions Section
-
-    private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Actions")
-                .font(.headline)
-                .padding(.horizontal, 4)
-
-            HStack(spacing: 12) {
-                QuickActionButton(
-                    icon: "note.text.badge.plus",
-                    label: "New Note"
-                ) {
-                    // Action for new note
-                }
-
-                QuickActionButton(
-                    icon: "doc.badge.plus",
-                    label: "Insert Document"
-                ) {
-                    // Action for insert document
-                }
-
-                QuickActionButton(
-                    icon: "questionmark.bubble",
-                    label: "Ask Question"
-                ) {
-                    // Action for ask question
-                }
-
-                QuickActionButton(
-                    icon: "point.3.connected.trianglepath.dotted",
-                    label: "Browse Graph"
-                ) {
-                    // Action for browse graph
-                }
+            Button {
+                NotificationCenter.default.post(name: .brainAIOpenDocuments, object: nil)
+            } label: {
+                Text(L10n.Dashboard.activityViewFullLog.uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .default))
+                    .tracking(0.6)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(SynapseColor.onSurfaceVariant)
+            .background(SynapseColor.surfaceContainerHigh)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(SynapseColor.outlineVariant.opacity(0.22), lineWidth: 1)
+            )
+            .padding(14)
+        }
+        .background(SynapseColor.surfaceContainerLow)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(SynapseColor.outlineVariant.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Footer pills
+
+    private var footerStatusPills: some View {
+        HStack(spacing: 10) {
+            footerPill(icon: "lock.shield", text: L10n.Dashboard.footerE2E)
+            footerPill(icon: "brain.head.profile", text: L10n.Dashboard.footerLocalInference)
+            footerPill(icon: "cylinder.split.1x2", text: L10n.Dashboard.footerSQLite)
+            Spacer(minLength: 0)
         }
     }
-}
 
-// MARK: - Stat Card Component
-
-private struct StatCard: View {
-    let icon: String
-    let value: Int
-    let label: String
-
-    var body: some View {
-        VStack(spacing: 8) {
+    private func footerPill(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(.blue)
-
-            Text(String(value))
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
+                .font(.system(size: 11, weight: .medium))
+            Text(text.uppercased())
+                .font(.system(size: 9, weight: .bold, design: .default))
+                .tracking(0.5)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 100)
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .foregroundStyle(SynapseColor.onSurfaceVariant)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(SynapseColor.surfaceContainerHigh.opacity(0.85))
+        .clipShape(Capsule(style: .continuous))
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Helpers
+
+    private func formatMetric(_ n: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator = ","
+        return f.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+
+    private func shortRelativeTime(_ date: Date) -> String {
+        let sec = Date().timeIntervalSince(date)
+        if sec < 120 { return L10n.Dashboard.timeJustNow }
+        if sec < 3600 {
+            let m = max(1, Int(sec / 60))
+            return L10n.Dashboard.timeShortMinutes(m)
+        }
+        if sec < 86400 {
+            let h = max(1, Int(sec / 3600))
+            return L10n.Dashboard.timeShortHours(h)
+        }
+        let d = max(1, Int(sec / 86400))
+        return L10n.Dashboard.timeDaysAgo(d)
+    }
+
+    private func pickIndexFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = L10n.Dashboard.chromeIndexFolder
+        if panel.runModal() == .OK, let url = panel.url {
+            NotificationCenter.default.post(name: .brainAIOpenDocuments, object: url)
+        }
     }
 }
 
-// MARK: - Service Status View Component
+// MARK: - Overview chrome (top bar)
 
-private struct ServiceStatusView: View {
-    let name: String
-    let isRunning: Bool
-    let statusText: String
+private struct DashboardOverviewChrome: View {
+    let ollamaRunning: Bool
+    let lightRAGRunning: Bool
+    @Binding var searchText: String
+    var onRefresh: () -> Void
+    var onNewChat: () -> Void
+    var onIndexFolder: () -> Void
+    var onSearchSubmit: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(isRunning ? Color.green : Color.red)
-                    .frame(width: 10, height: 10)
+        HStack(spacing: 16) {
+            HStack(spacing: 12) {
+                Text(L10n.Dashboard.chromeOverview.uppercased())
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(0.8)
+                    .foregroundStyle(SynapseColor.primary)
 
-                Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                statusPill(
+                    label: ollamaRunning ? L10n.Dashboard.chromeOllamaOn : L10n.Dashboard.chromeOllamaOff,
+                    ok: ollamaRunning
+                )
+                statusPill(
+                    label: lightRAGRunning ? L10n.Dashboard.chromeLightRAGOn : L10n.Dashboard.chromeLightRAGOff,
+                    ok: lightRAGRunning
+                )
             }
 
-            Text(statusText)
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Spacer(minLength: 12)
+
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(SynapseColor.onSurfaceVariant)
+                    TextField(L10n.Chrome.archiveSearchPlaceholder, text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(SynapseColor.onSurface)
+                        .frame(minWidth: 140, maxWidth: 220)
+                        .onSubmit { onSearchSubmit() }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(SynapseColor.surfaceContainerLowest)
+                .clipShape(Capsule(style: .continuous))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(SynapseColor.outlineVariant.opacity(0.25), lineWidth: 1)
+                )
+
+                chromeIconButton("plus", action: onSearchSubmit)
+                chromeIconButton("arrow.clockwise", action: onRefresh)
+                chromeIconButton("ellipsis", action: {})
+
+                Button(action: onNewChat) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.message")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(L10n.Dashboard.chromeNewChat)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(SynapseColor.onPrimaryFixed)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(SynapseStyle.primaryCTAGradient, in: Capsule(style: .continuous))
+                    .shadow(color: SynapseColor.primary.opacity(0.2), radius: 8, y: 2)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onIndexFolder) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 12, weight: .medium))
+                        Text(L10n.Dashboard.chromeIndexFolder)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(SynapseColor.surfaceContainerHigh)
+                    .clipShape(Capsule(style: .continuous))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(SynapseColor.outlineVariant.opacity(0.22), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Rectangle().fill(SynapseColor.surface.opacity(0.52))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(SynapseColor.outlineVariant.opacity(0.12))
+                .frame(height: 1)
+        }
     }
-}
 
-// MARK: - Activity Row Component
-
-private struct ActivityRow: View {
-    let activity: ActivityItem
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Timeline dot
+    private func statusPill(label: String, ok: Bool) -> some View {
+        HStack(spacing: 6) {
             Circle()
-                .fill(activityColor)
-                .frame(width: 8, height: 8)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activity.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text(activity.description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            Text(timeAgo)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .fill(ok ? Color.green : Color.red.opacity(0.85))
+                .frame(width: 6, height: 6)
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .bold, design: .default))
+                .tracking(0.4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
+        .foregroundStyle(SynapseColor.onSurfaceVariant)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(SynapseColor.surfaceContainerHigh.opacity(0.9))
+        .clipShape(Capsule(style: .continuous))
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(SynapseColor.outlineVariant.opacity(0.18), lineWidth: 1)
+        )
     }
 
-    private var activityColor: Color {
-        switch activity.type {
-        case .documentInserted:
-            return .blue
-        case .query:
-            return .purple
-        case .entityCreated:
-            return .green
-        case .relationCreated:
-            return .orange
-        }
-    }
-
-    private var timeAgo: String {
-        let now = Date()
-        let interval = now.timeIntervalSince(activity.timestamp)
-
-        switch interval {
-        case ..<60:
-            return "Just now"
-        case ..<3600:
-            let minutes = Int(interval / 60)
-            return "\(minutes)m ago"
-        case ..<86400:
-            let hours = Int(interval / 3600)
-            return "\(hours)h ago"
-        default:
-            let days = Int(interval / 86400)
-            return "\(days)d ago"
-        }
-    }
-}
-
-// MARK: - Quick Action Button Component
-
-private struct QuickActionButton: View {
-    let icon: String
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
+    private func chromeIconButton(_ systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.title3)
-
-                Text(label)
-                    .font(.caption)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 80)
-            .foregroundColor(.primary)
-            .background(.ultraThinMaterial)
-            .cornerRadius(8)
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
+                .frame(width: 32, height: 30)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - Preview
+// MARK: - Metric tile
+
+private struct OverviewMetricTile: View {
+    let icon: String
+    let iconTint: Color
+    let tag: String
+    let value: String
+    let caption: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(iconTint)
+                Spacer(minLength: 0)
+                Text(tag.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .default))
+                    .tracking(0.5)
+                    .foregroundStyle(SynapseColor.primary.opacity(0.95))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(SynapseColor.primaryContainer.opacity(0.15))
+                    .clipShape(Capsule(style: .continuous))
+            }
+
+            Spacer(minLength: 10)
+
+            Text(value)
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(SynapseColor.onSurface)
+                .minimumScaleFactor(0.8)
+                .lineLimit(1)
+
+            Text(caption)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
+                .padding(.top, 6)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+        .background(SynapseColor.surfaceContainerLow)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(SynapseColor.outlineVariant.opacity(0.22), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Activity row (compact)
+
+private struct DashboardActivityCompactRow: View {
+    let activity: ActivityItem
+    let shortTime: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(SynapseColor.surfaceContainerHigh)
+                .frame(width: 36, height: 36)
+                .overlay {
+                    Image(systemName: activity.type == .query ? "bubble.left" : "doc.text")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(SynapseColor.primary)
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(activity.title)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(SynapseColor.onSurface)
+                    .lineLimit(2)
+                Text(activity.description)
+                    .font(.system(size: 10, weight: .regular, design: .rounded))
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(shortTime)
+                .font(.system(size: 9, weight: .bold, design: .default))
+                .tracking(0.3)
+                .foregroundStyle(SynapseColor.onSurfaceVariant.opacity(0.85))
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+    }
+}
 
 #Preview {
     DashboardView()

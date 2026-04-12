@@ -1,5 +1,6 @@
 import SpriteKit
 import Foundation
+import BrainAICore
 
 // MARK: - Graph Data Models
 
@@ -113,7 +114,7 @@ final class GraphScene: SKScene {
 
     override func didMove(to view: SKView) {
         super.didMove(to: view)
-        backgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0)
+        backgroundColor = SynapseColor.graphBackgroundNSColor
 
         cameraNode = SKCameraNode()
         cameraNode.position = CGPoint(x: size.width / 2, y: size.height / 2)

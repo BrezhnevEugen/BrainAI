@@ -18,6 +18,10 @@
 "common.next" = "Далі";
 "common.copy" = "Копіювати";
 "common.share" = "Поділитися";
+"common.brand_tagline" = "Нейроархів";
+
+/* Chrome (Stitch main window top bar) */
+"chrome.archive_search_placeholder" = "Пошук в архіві…";
 
 /* Navigation */
 "nav.dashboard" = "Головна";
@@ -26,6 +30,7 @@
 "nav.search" = "Пошук";
 "nav.notes" = "Нотатки";
 "nav.graph" = "Граф знань";
+"nav.settings" = "Налаштування";
 
 /* Chat */
 "chat.placeholder" = "Поставте запитання...";
@@ -129,3 +134,82 @@
 "errors.server_unavailable" = "Сервер недоступний";
 "errors.decoding" = "Помилка формату даних";
 "errors.unknown" = "Виникла непередбачена помилка";
+
+/* Dashboard */
+"dashboard.hero_title" = "Пульс архіву";
+"dashboard.hero_subtitle" = "Граф знань і сервіси активні.";
+"dashboard.export_graph" = "Експорт графа";
+"dashboard.new_entry" = "Новий запис";
+"dashboard.overview" = "Огляд";
+"dashboard.active_workspace" = "Активний робочий простір";
+"dashboard.service_status" = "Стан сервісів";
+"dashboard.recent_activity" = "Нещодавня активність";
+"dashboard.quick_actions" = "Швидкі дії";
+"dashboard.provider_roles" = "Ролі провайдерів";
+"dashboard.workspace.none" = "Немає робочого простору";
+"dashboard.workspace.active" = "Активно";
+"dashboard.workspace.inactive" = "Неактивно";
+"dashboard.service.running" = "Працює";
+"dashboard.service.stopped" = "Зупинено";
+"dashboard.service.error" = "Помилка";
+"dashboard.service.unknown" = "Невідомо";
+"dashboard.stat.entities" = "Сутності";
+"dashboard.stat.relations" = "Зв'язки";
+"dashboard.stat.documents" = "Документи";
+"dashboard.stat.workspaces" = "Простори";
+"dashboard.quick_search_placeholder" = "Швидкий пошук…";
+"dashboard.action.new_note" = "Нова нотатка";
+"dashboard.action.insert_document" = "Додати документ";
+"dashboard.action.ask_question" = "Поставити запитання";
+"dashboard.action.browse_graph" = "Відкрити граф";
+"dashboard.activity.document_inserted" = "Документ додано";
+"dashboard.activity.query_executed" = "Виконано запит";
+"dashboard.activity.sample_ml" = "Наукова стаття з ML";
+"dashboard.activity.sample_transformers" = "Що таке трансформери?";
+"dashboard.activity.sample_report" = "Річний звіт 2024";
+"dashboard.activity.sample_summarize" = "Коротко виділити висновки";
+"dashboard.time.just_now" = "Щойно";
+"dashboard.time.minutes_ago" = "%d хв тому";
+"dashboard.time.hours_ago" = "%d год тому";
+"dashboard.time.days_ago" = "%d дн тому";
+"dashboard.service_name.ollama" = "Ollama";
+"dashboard.service_name.lightrag" = "LightRAG";
+
+"dashboard.chrome.overview" = "Огляд";
+"dashboard.chrome.ollama_on" = "Ollama: активний";
+"dashboard.chrome.ollama_off" = "Ollama: вимкн.";
+"dashboard.chrome.lightrag_on" = "LightRAG: активний";
+"dashboard.chrome.lightrag_off" = "LightRAG: вимкн.";
+"dashboard.chrome.new_chat" = "Новий чат";
+"dashboard.chrome.index_folder" = "Індексувати теку";
+"dashboard.metric.tag.total" = "Усього";
+"dashboard.metric.tag.linked" = "Зв'язків";
+"dashboard.metric.tag.stored" = "Збережено";
+"dashboard.metric.tag.active" = "Активно";
+"dashboard.metric.caption.entities" = "Сутності проіндексовано";
+"dashboard.metric.caption.relations" = "Нейрозв'язки";
+"dashboard.metric.caption.documents" = "Локальні документи";
+"dashboard.metric.caption.workspaces" = "Робочі простори";
+"dashboard.workspace.section_active" = "Активний робочий простір";
+"dashboard.workspace.resume" = "Продовжити";
+"dashboard.workspace.settings_link" = "Налаштування простору";
+"dashboard.workspace.blurb" = "Аналіз локальних репозиторіїв. Тримайте сервіси увімкненими для синхронізації графа знань.";
+"dashboard.workspace.blurb_empty" = "Оберіть або створіть робочий простір у налаштуваннях для індексації документів.";
+"dashboard.activity.view_full_log" = "Повний журнал";
+"dashboard.footer.e2e" = "Наскрізне шифрування";
+"dashboard.footer.local_inference" = "Локальний інференс";
+"dashboard.footer.sqlite" = "SQLite";
+"dashboard.time.short_minutes" = "%dХВ ТОМУ";
+"dashboard.time.short_hours" = "%dГ ТОМУ";
+"sidebar.local_instance" = "Локальний екземпляр";
+"dashboard.role.embedding" = "Ембеддинг";
+"dashboard.role.extraction" = "Витяг";
+"dashboard.role.reranking" = "Реранжування";
+"dashboard.role.generation" = "Генерація";
+
+/* Main menu */
+"app.menu.quit" = "Завершити BrainAI";
+"app.menu.section" = "BrainAI";
+"app.menu.quick_search" = "Швидкий пошук";
+"app.menu.new_note" = "Нова нотатка";
+"app.menu.settings" = "Налаштування…";

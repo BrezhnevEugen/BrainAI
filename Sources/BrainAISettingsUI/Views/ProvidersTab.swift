@@ -27,7 +27,9 @@ struct ProvidersTab: View {
                 ProvidersConfigView(config: config)
             }
         }
-        .navigationTitle("Providers & Roles")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.providers)
     }
 }
 

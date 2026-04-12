@@ -13,6 +13,10 @@ let package = Package(
             name: "BrainAICore",
             targets: ["BrainAICore"]
         ),
+        .library(
+            name: "BrainAISettingsUI",
+            targets: ["BrainAISettingsUI"]
+        ),
         .executable(
             name: "BrainAITray",
             targets: ["BrainAITray"]
@@ -55,7 +59,14 @@ let package = Package(
             path: "Sources/BrainAITray"
         ),
 
-        // MARK: - Settings App (SwiftUI)
+        // MARK: - Settings UI (shared: main app + optional standalone)
+        .target(
+            name: "BrainAISettingsUI",
+            dependencies: ["BrainAICore"],
+            path: "Sources/BrainAISettingsUI"
+        ),
+
+        // MARK: - Settings launcher (thin → opens BrainAI.app settings)
         .executableTarget(
             name: "BrainAISettings",
             dependencies: ["BrainAICore"],
@@ -65,7 +76,7 @@ let package = Package(
         // MARK: - Main UI App (SwiftUI)
         .executableTarget(
             name: "BrainAIApp",
-            dependencies: ["BrainAICore"],
+            dependencies: ["BrainAICore", "BrainAISettingsUI"],
             path: "Sources/BrainAIApp"
         ),
 

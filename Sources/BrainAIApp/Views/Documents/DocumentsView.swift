@@ -142,7 +142,7 @@ struct DocumentsView: View {
                 ProgressView()
                     .scaleEffect(1.5)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.1))
+                    .background(SynapseColor.surface.opacity(0.45))
             }
         }
         .onDrop(of: [UTType.text, UTType.plainText, UTType.fileURL], isTargeted: nil) { providers in
@@ -151,7 +151,8 @@ struct DocumentsView: View {
         .task {
             await viewModel.loadDocuments()
         }
-        .navigationTitle("Documents")
+        .synapseRootBackground()
+        .navigationTitle(L10n.Documents.title)
     }
 
     // MARK: - Toolbar
@@ -196,12 +197,13 @@ struct DocumentsView: View {
                 // Document count
                 Text("\(viewModel.totalDocuments) document\(viewModel.totalDocuments == 1 ? "" : "s")")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
             }
             .padding(12)
-            .background(.ultraThinMaterial)
+            .synapseToolbarStrip()
 
             Divider()
+                .background(SynapseColor.outlineVariant.opacity(0.2))
         }
     }
 
@@ -225,20 +227,22 @@ struct DocumentsView: View {
                     Spacer()
                 }
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
                 Divider()
+                    .background(SynapseColor.outlineVariant.opacity(0.15))
 
                 // Document rows
                 ForEach(viewModel.documents, id: \.id) { document in
                     DocumentRow(document: document)
 
                     Divider()
+                        .background(SynapseColor.outlineVariant.opacity(0.12))
                 }
             }
-            .background(.ultraThinMaterial)
+            .background(SynapseColor.surfaceContainer)
         }
     }
 
@@ -248,23 +252,25 @@ struct DocumentsView: View {
         VStack(spacing: 20) {
             Image(systemName: "doc.badge.plus")
                 .font(.system(size: 48))
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
 
             VStack(spacing: 8) {
                 Text("No documents yet")
                     .font(.headline)
+                    .foregroundStyle(SynapseColor.onSurface)
 
                 Text("Import files to get started")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
             }
 
             Button(action: openFileImporter) {
                 Label("Import Files", systemImage: "doc.badge.plus")
             }
+            .tint(SynapseColor.primaryContainer)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
+        .background(SynapseColor.surface)
     }
 
     // MARK: - Pagination Footer
@@ -285,7 +291,7 @@ struct DocumentsView: View {
             Spacer()
         }
         .padding(12)
-        .background(.ultraThinMaterial)
+        .background(SynapseColor.surfaceContainer)
     }
 
     // MARK: - File Import
@@ -388,7 +394,7 @@ private struct DocumentRow: View {
             Text(formatDate(document.updatedAt))
                 .frame(width: 100, alignment: .leading)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
 
             Spacer()
         }
@@ -399,13 +405,13 @@ private struct DocumentRow: View {
     private var statusColor: Color {
         switch document.status {
         case .pending:
-            return .yellow
+            return SynapseColor.secondary
         case .processing:
-            return .blue
+            return SynapseColor.primaryContainer
         case .processed:
-            return .green
+            return SynapseColor.tertiary
         case .failed:
-            return .red
+            return SynapseColor.error
         }
     }
 

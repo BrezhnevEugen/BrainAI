@@ -18,6 +18,10 @@
 "common.next" = "Next";
 "common.copy" = "Copy";
 "common.share" = "Share";
+"common.brand_tagline" = "Neural Archive";
+
+/* Chrome (Stitch main window top bar) */
+"chrome.archive_search_placeholder" = "Search archive…";
 
 /* Navigation */
 "nav.dashboard" = "Dashboard";
@@ -26,6 +30,7 @@
 "nav.search" = "Search";
 "nav.notes" = "Notes";
 "nav.graph" = "Knowledge Graph";
+"nav.settings" = "Settings";
 
 /* Chat */
 "chat.placeholder" = "Ask a question...";
@@ -129,3 +134,83 @@
 "errors.server_unavailable" = "Server is unavailable";
 "errors.decoding" = "Data format error";
 "errors.unknown" = "An unexpected error occurred";
+
+/* Dashboard */
+"dashboard.hero_title" = "Archive Pulse";
+"dashboard.hero_subtitle" = "Neural graph and services are live.";
+"dashboard.export_graph" = "Export Graph";
+"dashboard.new_entry" = "New Entry";
+"dashboard.overview" = "Overview";
+"dashboard.active_workspace" = "Active Workspace";
+"dashboard.service_status" = "Service Status";
+"dashboard.recent_activity" = "Recent Activity";
+"dashboard.quick_actions" = "Quick Actions";
+"dashboard.provider_roles" = "Provider Roles";
+"dashboard.workspace.none" = "No Workspace";
+"dashboard.workspace.active" = "Active";
+"dashboard.workspace.inactive" = "Inactive";
+"dashboard.service.running" = "Running";
+"dashboard.service.stopped" = "Stopped";
+"dashboard.service.error" = "Error";
+"dashboard.service.unknown" = "Unknown";
+"dashboard.stat.entities" = "Entities";
+"dashboard.stat.relations" = "Relations";
+"dashboard.stat.documents" = "Documents";
+"dashboard.stat.workspaces" = "Workspaces";
+"dashboard.quick_search_placeholder" = "Quick search…";
+"dashboard.action.new_note" = "New Note";
+"dashboard.action.insert_document" = "Insert Document";
+"dashboard.action.ask_question" = "Ask Question";
+"dashboard.action.browse_graph" = "Browse Graph";
+"dashboard.activity.document_inserted" = "Document inserted";
+"dashboard.activity.query_executed" = "Query executed";
+"dashboard.activity.sample_ml" = "Research paper on ML";
+"dashboard.activity.sample_transformers" = "What are transformer models?";
+"dashboard.activity.sample_report" = "Annual Report 2024";
+"dashboard.activity.sample_summarize" = "Summarize key findings";
+"dashboard.time.just_now" = "Just now";
+"dashboard.time.minutes_ago" = "%dm ago";
+"dashboard.time.hours_ago" = "%dh ago";
+"dashboard.time.days_ago" = "%dd ago";
+"dashboard.service_name.ollama" = "Ollama";
+"dashboard.service_name.lightrag" = "LightRAG";
+
+/* Dashboard — overview chrome (reference layout) */
+"dashboard.chrome.overview" = "Overview";
+"dashboard.chrome.ollama_on" = "Ollama: Active";
+"dashboard.chrome.ollama_off" = "Ollama: Off";
+"dashboard.chrome.lightrag_on" = "LightRAG: Active";
+"dashboard.chrome.lightrag_off" = "LightRAG: Off";
+"dashboard.chrome.new_chat" = "New Chat";
+"dashboard.chrome.index_folder" = "Index Folder";
+"dashboard.metric.tag.total" = "Total";
+"dashboard.metric.tag.linked" = "Linked";
+"dashboard.metric.tag.stored" = "Stored";
+"dashboard.metric.tag.active" = "Active";
+"dashboard.metric.caption.entities" = "Entities indexed";
+"dashboard.metric.caption.relations" = "Neural relations";
+"dashboard.metric.caption.documents" = "Local documents";
+"dashboard.metric.caption.workspaces" = "Workspaces";
+"dashboard.workspace.section_active" = "Active workspace";
+"dashboard.workspace.resume" = "Resume Research";
+"dashboard.workspace.settings_link" = "Workspace Settings";
+"dashboard.workspace.blurb" = "Deep analysis of local repositories. Keep services running to synchronize the knowledge graph.";
+"dashboard.workspace.blurb_empty" = "Select or create a workspace in Settings to index documents and build your graph.";
+"dashboard.activity.view_full_log" = "View Full Log";
+"dashboard.footer.e2e" = "E2E Encrypted";
+"dashboard.footer.local_inference" = "Local Inference";
+"dashboard.footer.sqlite" = "SQLite Backend";
+"dashboard.time.short_minutes" = "%dM AGO";
+"dashboard.time.short_hours" = "%dH AGO";
+"sidebar.local_instance" = "Local instance";
+"dashboard.role.embedding" = "Embedding";
+"dashboard.role.extraction" = "Extraction";
+"dashboard.role.reranking" = "Reranking";
+"dashboard.role.generation" = "Generation";
+
+/* Main menu */
+"app.menu.quit" = "Quit BrainAI";
+"app.menu.section" = "BrainAI";
+"app.menu.quick_search" = "Quick Search";
+"app.menu.new_note" = "New Note";
+"app.menu.settings" = "Settings…";

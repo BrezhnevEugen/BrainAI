@@ -335,18 +335,7 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        let parent = Bundle.main.bundleURL.deletingLastPathComponent()
-        let settingsApp = parent.appendingPathComponent("BrainAI Settings.app", isDirectory: true)
-        if FileManager.default.fileExists(atPath: settingsApp.path) {
-            NSWorkspace.shared.open(settingsApp)
-            return
-        }
-        let settingsBinary = parent.appendingPathComponent("BrainAISettings")
-        if FileManager.default.fileExists(atPath: settingsBinary.path) {
-            let task = Process()
-            task.executableURL = settingsBinary
-            try? task.run()
-        }
+        BrainAICompanionAppLauncher.openSettings()
     }
 
     @objc private func quitApp() {

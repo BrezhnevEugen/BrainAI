@@ -7,6 +7,11 @@ import BrainAICore
 extension Notification.Name {
     static let brainAIQuickSearch = Notification.Name("com.brainai.app.quickSearch")
     static let brainAINewNote = Notification.Name("com.brainai.app.newNote")
+    static let brainAIOpenGraph = Notification.Name("com.brainai.app.openGraph")
+    static let brainAINewChat = Notification.Name("com.brainai.app.newChat")
+    static let brainAIOpenSearch = Notification.Name("com.brainai.app.openSearch")
+    static let brainAIOpenDocuments = Notification.Name("com.brainai.app.openDocuments")
+    static let brainAIOpenSettings = Notification.Name("com.brainai.app.openSettings")
 }
 
 // MARK: - AppKit entry (SPM executable: SwiftUI `App`/`Scene` often creates no `NSWindow`)
@@ -25,19 +30,35 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
     static let shared = BrainAIApplicationDelegate()
 
     private var window: NSWindow?
+    private var distributedOpenSettingsObserver: NSObjectProtocol?
+    private var shouldOpenSettingsAfterLaunch = false
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        shouldOpenSettingsAfterLaunch = ProcessInfo.processInfo.arguments.contains("--open-settings")
         UserNotificationService.shared.configure()
         setupMainMenu()
+        distributedOpenSettingsObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.brainai.OpenSettings"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.focusMainWindowAndPostOpenSettings()
+        }
         // Building NSHostingController synchronously inside didFinishLaunching can starve the
         // first run-loop turns; defer so AppKit marks the app responsive and SwiftUI gets a clean first frame.
         DispatchQueue.main.async { [weak self] in
             self?.installMainWindow()
         }
+    }
+
+    private func focusMainWindowAndPostOpenSettings() {
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .brainAIOpenSettings, object: nil)
     }
 
     private func installMainWindow() {
@@ -59,6 +80,11 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
+
+        if shouldOpenSettingsAfterLaunch {
+            shouldOpenSettingsAfterLaunch = false
+            NotificationCenter.default.post(name: .brainAIOpenSettings, object: nil)
+        }
     }
 
     private func setupMainMenu() {
@@ -69,16 +95,18 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appItem.submenu = appMenu
         appMenu.addItem(
-            withTitle: "Quit BrainAI",
+            withTitle: L10n.AppMenu.quit,
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
 
-        let brainItem = NSMenuItem(title: "BrainAI", action: nil, keyEquivalent: "")
-        let brainMenu = NSMenu(title: "BrainAI")
+        let brainItem = NSMenuItem(title: L10n.AppMenu.sectionTitle, action: nil, keyEquivalent: "")
+        let brainMenu = NSMenu(title: L10n.AppMenu.sectionTitle)
         brainItem.submenu = brainMenu
-        brainMenu.addItem(makeMenuItem(title: "Quick Search", action: #selector(quickSearch), key: "k"))
-        brainMenu.addItem(makeMenuItem(title: "New Note", action: #selector(newNote), key: "n"))
+        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.quickSearch, action: #selector(quickSearch), key: "k"))
+        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.newNote, action: #selector(newNote), key: "n"))
+        brainMenu.addItem(NSMenuItem.separator())
+        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.settings, action: #selector(openSettings), key: ","))
         mainMenu.addItem(brainItem)
 
         NSApp.mainMenu = mainMenu
@@ -97,5 +125,9 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func newNote() {
         NotificationCenter.default.post(name: .brainAINewNote, object: nil)
+    }
+
+    @objc private func openSettings() {
+        NotificationCenter.default.post(name: .brainAIOpenSettings, object: nil)
     }
 }

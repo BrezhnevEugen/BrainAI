@@ -91,7 +91,9 @@ struct ModelsTab: View {
             }
             .padding()
         }
-        .navigationTitle("Models")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.models)
         .onAppear { Task { await loadModels() } }
         .confirmationDialog(
             "Delete Model",

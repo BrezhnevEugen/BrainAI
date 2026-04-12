@@ -168,16 +168,19 @@ struct ChatView: View {
             toolbarArea
 
             Divider()
+                .background(SynapseColor.outlineVariant.opacity(0.25))
 
             // Messages area
             messagesArea
 
             Divider()
+                .background(SynapseColor.outlineVariant.opacity(0.25))
 
             // Input area
             inputArea
         }
-        .navigationTitle("AI Chat")
+        .synapseRootBackground()
+        .navigationTitle(L10n.Nav.chat)
     }
 
     // MARK: - Toolbar Area
@@ -187,7 +190,7 @@ struct ChatView: View {
             // Model picker
             HStack(spacing: 8) {
                 Image(systemName: "brain")
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 Menu {
                     ForEach([
@@ -210,8 +213,7 @@ struct ChatView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .cornerRadius(6)
+            .synapseCardSurface(cornerRadius: 8)
 
             // Search mode picker
             Picker("Search Mode", selection: $viewModel.selectedMode) {
@@ -229,12 +231,13 @@ struct ChatView: View {
             // Clear chat button
             Button(action: { viewModel.clearChat() }) {
                 Image(systemName: "trash")
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
             }
             .buttonStyle(.plain)
             .help("Clear chat history")
         }
         .padding(12)
+        .synapseToolbarStrip()
     }
 
     // MARK: - Messages Area
@@ -285,36 +288,45 @@ struct ChatView: View {
                 if message.role == .assistant {
                     Image(systemName: "brain.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(.blue)
+                        .foregroundStyle(SynapseColor.primary)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(message.content)
                         .lineLimit(nil)
                         .textSelection(.enabled)
+                        .foregroundStyle(SynapseColor.onSurface)
 
                     // Context disclosure
                     if let context = message.ragContext, !context.isEmpty {
                         DisclosureGroup("RAG Context") {
                             Text(context)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundStyle(SynapseColor.onSurfaceVariant)
                                 .textSelection(.enabled)
                                 .padding(8)
-                                .background(Color(.controlBackgroundColor))
-                                .cornerRadius(4)
+                                .background(SynapseColor.surfaceContainerLowest)
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         }
                         .font(.caption)
                     }
                 }
                 .padding(12)
-                .background(.ultraThinMaterial)
-                .cornerRadius(12)
+                .background(
+                    message.role == .user
+                        ? AnyShapeStyle(SynapseColor.surfaceContainerHighest)
+                        : AnyShapeStyle(SynapseColor.surfaceContainerHigh)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
+                        .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
 
                 if message.role == .user {
                     Image(systemName: "person.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(.blue)
+                        .foregroundStyle(SynapseColor.primary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
@@ -322,7 +334,7 @@ struct ChatView: View {
             // Timestamp
             Text(message.timestamp.formatted(date: .omitted, time: .standard))
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
                 .padding(.horizontal, 4)
         }
     }
@@ -333,25 +345,24 @@ struct ChatView: View {
         HStack(spacing: 4) {
             Image(systemName: "brain.fill")
                 .font(.system(size: 14))
-                .foregroundColor(.blue)
+                .foregroundStyle(SynapseColor.primary)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     ForEach(0..<3, id: \.self) { index in
                         Circle()
-                            .fill(Color.blue.opacity(0.6))
+                            .fill(SynapseColor.primaryContainer.opacity(0.75))
                             .frame(width: 8, height: 8)
                             .scaleEffect(animatingDot(index: index))
                     }
 
                     Text("Generating...")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(SynapseColor.onSurfaceVariant)
                 }
             }
             .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
+            .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -367,21 +378,27 @@ struct ChatView: View {
             TextEditor(text: $viewModel.inputText)
                 .frame(minHeight: 40, maxHeight: 100)
                 .scrollContentBackground(.hidden)
-                .background(.ultraThinMaterial)
-                .cornerRadius(8)
+                .padding(8)
+                .background(SynapseColor.surfaceContainerHigh)
+                .clipShape(RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
+                        .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+                )
                 .lineLimit(4)
                 .font(.body)
+                .foregroundStyle(SynapseColor.onSurface)
 
             Button(action: { viewModel.sendMessage() }) {
                 Image(systemName: "paperplane.fill")
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
                             .fill(
                                 viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isGenerating
-                                    ? Color.gray.opacity(0.5)
-                                    : Color.blue
+                                    ? AnyShapeStyle(SynapseColor.outlineVariant.opacity(0.45))
+                                    : AnyShapeStyle(SynapseStyle.primaryCTAGradient)
                             )
                     )
             }

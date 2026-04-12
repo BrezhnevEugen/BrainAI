@@ -141,7 +141,9 @@ struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("General")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.general)
         .onAppear {
             loadLaunchAtLoginState()
             UserNotificationService.shared.configure()

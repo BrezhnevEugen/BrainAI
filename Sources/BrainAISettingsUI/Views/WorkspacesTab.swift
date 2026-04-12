@@ -54,7 +54,9 @@ struct WorkspacesTab: View {
                 }
             }
         }
-        .navigationTitle("Workspaces")
+        .scrollContentBackground(.hidden)
+        .background(SynapseColor.surface)
+        .navigationTitle(L10n.Settings.workspaces)
         .sheet(isPresented: $showCreateSheet) {
             CreateWorkspaceSheet(manager: workspaceManager, isPresented: $showCreateSheet)
         }

@@ -25,6 +25,8 @@ struct KnowledgeGraphView: View {
         .toolbar {
             toolbarContent
         }
+        .synapseRootBackground()
+        .navigationTitle(L10n.Graph.title)
         .task {
             await loadGraph()
         }
@@ -39,7 +41,7 @@ struct KnowledgeGraphView: View {
                 SpriteView(scene: scene, options: [.allowsTransparency])
                     .ignoresSafeArea()
             } else {
-                Color(nsColor: NSColor(red: 0.10, green: 0.10, blue: 0.12, alpha: 1.0))
+                SynapseColor.surface
             }
 
             // Overlay controls
@@ -114,8 +116,7 @@ struct KnowledgeGraphView: View {
             }
         }
         .padding(10)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
         .frame(maxWidth: 300)
     }
 
@@ -130,8 +131,7 @@ struct KnowledgeGraphView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .cornerRadius(6)
+        .synapseCardSurface(cornerRadius: 8)
     }
 
     // MARK: - Filter Panel
@@ -182,8 +182,7 @@ struct KnowledgeGraphView: View {
             }
         }
         .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
         .frame(maxWidth: 200)
     }
 
@@ -219,8 +218,7 @@ struct KnowledgeGraphView: View {
             }
         }
         .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
         .frame(maxWidth: 220)
     }
 
@@ -242,8 +240,7 @@ struct KnowledgeGraphView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(.ultraThinMaterial)
-            .cornerRadius(4)
+            .synapseCardSurface(cornerRadius: 6)
         }
     }
 
@@ -258,8 +255,7 @@ struct KnowledgeGraphView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(24)
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
     }
 
     private func errorOverlay(_ message: String) -> some View {
@@ -273,8 +269,7 @@ struct KnowledgeGraphView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(16)
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
         .frame(maxWidth: 300)
         .transition(.opacity)
     }
@@ -374,7 +369,7 @@ struct KnowledgeGraphView: View {
             }
             .padding()
         }
-        .background(.background)
+        .background(SynapseColor.surfaceContainerLow)
     }
 
     // MARK: - Toolbar

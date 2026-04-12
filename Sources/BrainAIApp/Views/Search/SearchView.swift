@@ -106,19 +106,24 @@ struct SearchView: View {
             // Search Bar Section
             searchBarSection
                 .padding()
-                .background(Color(nsColor: .controlBackgroundColor))
-                .border(Color.gray.opacity(0.2), width: 1)
+                .background(SynapseColor.surfaceContainer)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(SynapseColor.outlineVariant.opacity(0.2))
+                        .frame(height: 1)
+                        .frame(maxWidth: .infinity)
+                }
 
             // Filters Row
             filtersRow
                 .padding()
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(SynapseColor.surfaceContainer)
 
             // Results Section
             if viewModel.isSearching {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(nsColor: .controlBackgroundColor))
+                    .synapseRootBackground()
             } else if viewModel.results.isEmpty && !viewModel.searchText.isEmpty {
                 emptyStateView
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -131,7 +136,8 @@ struct SearchView: View {
 
             Spacer()
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .synapseRootBackground()
+        .navigationTitle(L10n.Nav.search)
     }
 
     // MARK: - Search Bar Section
@@ -140,7 +146,7 @@ struct SearchView: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 TextField("Search your knowledge base...", text: $viewModel.searchText)
                     .onSubmit {
@@ -154,16 +160,22 @@ struct SearchView: View {
                         .frame(minWidth: 60)
                 }
                 .keyboardShortcut(.return, modifiers: [])
+                .buttonStyle(.borderedProminent)
+                .tint(SynapseColor.primaryContainer)
             }
             .padding(10)
-            .background(Color(nsColor: .textBackgroundColor))
-            .cornerRadius(8)
+            .background(SynapseColor.surfaceContainerHigh)
+            .clipShape(RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: SynapseLayout.cardCornerRadius, style: .continuous)
+                    .stroke(SynapseColor.outlineVariant.opacity(0.2), lineWidth: 1)
+            )
 
             // Search Mode Picker
             HStack {
                 Text("Mode:")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 Picker("Search Mode", selection: $viewModel.selectedMode) {
                     Text("Hybrid").tag(SearchMode.hybrid)
@@ -186,7 +198,7 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Top-K Results")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 HStack(spacing: 8) {
                     Button(action: {
@@ -212,7 +224,7 @@ struct SearchView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Results")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
 
                 Text("\(viewModel.results.count)")
                     .font(.body.monospacedDigit())
@@ -242,35 +254,33 @@ struct SearchView: View {
             Text(result.content)
                 .font(.body)
                 .lineLimit(3)
-                .foregroundColor(.primary)
+                .foregroundStyle(SynapseColor.onSurface)
 
             HStack(spacing: 12) {
                 if let source = result.source {
                     Label(source, systemImage: "doc.text")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(SynapseColor.onSurfaceVariant)
                 }
 
                 if let score = result.relevanceScore {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundStyle(SynapseColor.primary)
 
                         Text(String(format: "%.2f", score))
                             .font(.caption)
                             .monospacedDigit()
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(SynapseColor.onSurfaceVariant)
                 }
 
                 Spacer()
             }
         }
         .padding()
-        .background(Color(nsColor: .controlBackgroundColor))
-        .background(.ultraThinMaterial)
-        .cornerRadius(8)
+        .synapseCardSurface(cornerRadius: SynapseLayout.cardCornerRadius)
     }
 
     // MARK: - Empty State View
@@ -279,19 +289,20 @@ struct SearchView: View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
-                .foregroundColor(.gray.opacity(0.5))
+                .foregroundStyle(SynapseColor.onSurfaceVariant.opacity(0.55))
 
             Text("No Results Found")
                 .font(.title3)
                 .fontWeight(.semibold)
+                .foregroundStyle(SynapseColor.onSurface)
 
             Text("Try refining your search query or adjusting the search mode")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .synapseRootBackground()
     }
 
     // MARK: - Initial State View
@@ -300,19 +311,20 @@ struct SearchView: View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
-                .foregroundColor(.gray.opacity(0.5))
+                .foregroundStyle(SynapseColor.onSurfaceVariant.opacity(0.55))
 
             Text("Enter a Query")
                 .font(.title3)
                 .fontWeight(.semibold)
+                .foregroundStyle(SynapseColor.onSurface)
 
             Text("Enter a search query to explore your knowledge base")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .synapseRootBackground()
     }
 }
 

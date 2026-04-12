@@ -6,10 +6,9 @@ import Foundation
 /// Supports English, Russian, and Ukrainian
 public final class L10n: Sendable {
 
-    /// Current app locale (resolved from AppLanguage setting)
+    /// Current app locale (resolved from `AppConfiguration.language`)
     public static var locale: Locale {
-        let lang = AppLanguage(rawValue: UserDefaults.standard.string(forKey: "appLanguage") ?? "system") ?? .system
-        switch lang {
+        switch AppConfiguration.shared.language {
         case .system: return .current
         case .en: return Locale(identifier: "en")
         case .ru: return Locale(identifier: "ru")
@@ -17,18 +16,52 @@ public final class L10n: Sendable {
         }
     }
 
-    /// Bundle identifier hint for localization lookup
-    nonisolated(unsafe) private static var _bundle: Bundle = .main
+    /// Base bundle that contains `en.lproj`, `ru.lproj`, … (defaults to `BrainAI_BrainAICore.bundle`).
+    nonisolated(unsafe) private static var _resourceBase: Bundle?
 
     public static var bundle: Bundle {
-        get { _bundle }
-        set { _bundle = newValue }
+        get { _resourceBase ?? BrainAICoreResources.bundle }
+        set { _resourceBase = newValue }
+    }
+
+    private static func resolvedLanguageCode() -> String {
+        switch AppConfiguration.shared.language {
+        case .system:
+            if let first = Locale.preferredLanguages.first {
+                return String(first.prefix(while: { $0 != "-" && $0 != "_" }))
+            }
+            return "en"
+        case .en: return "en"
+        case .ru: return "ru"
+        case .uk: return "uk"
+        }
+    }
+
+    private static func localizedStringsBundle() -> Bundle {
+        let base = bundle
+        let code = resolvedLanguageCode()
+        if let url = base.url(forResource: code, withExtension: "lproj"),
+           let b = Bundle(url: url) {
+            return b
+        }
+        let short = String(code.prefix(while: { $0 != "-" && $0 != "_" }))
+        if short != code, let url = base.url(forResource: short, withExtension: "lproj"),
+           let b = Bundle(url: url) {
+            return b
+        }
+        if let url = base.url(forResource: "en", withExtension: "lproj"),
+           let b = Bundle(url: url) {
+            return b
+        }
+        return base
     }
 
     // MARK: - Common
 
     public enum Common {
         public static var appName: String { tr("common.app_name") }
+        /// Stitch sidebar subtitle under the wordmark.
+        public static var brandTagline: String { tr("common.brand_tagline") }
         public static var ok: String { tr("common.ok") }
         public static var cancel: String { tr("common.cancel") }
         public static var save: String { tr("common.save") }
@@ -49,6 +82,10 @@ public final class L10n: Sendable {
 
     // MARK: - Sidebar / Navigation
 
+    public enum Sidebar {
+        public static var localInstance: String { tr("sidebar.local_instance") }
+    }
+
     public enum Nav {
         public static var dashboard: String { tr("nav.dashboard") }
         public static var chat: String { tr("nav.chat") }
@@ -56,6 +93,102 @@ public final class L10n: Sendable {
         public static var search: String { tr("nav.search") }
         public static var notes: String { tr("nav.notes") }
         public static var graph: String { tr("nav.graph") }
+        public static var settings: String { tr("nav.settings") }
+    }
+
+    // MARK: - Dashboard
+
+    /// Main-window chrome (Stitch top bar).
+    public enum Chrome {
+        public static var archiveSearchPlaceholder: String { tr("chrome.archive_search_placeholder") }
+    }
+
+    public enum Dashboard {
+        public static var heroTitle: String { tr("dashboard.hero_title") }
+        public static var heroSubtitle: String { tr("dashboard.hero_subtitle") }
+        public static var exportGraph: String { tr("dashboard.export_graph") }
+        public static var newEntry: String { tr("dashboard.new_entry") }
+        public static var overview: String { tr("dashboard.overview") }
+        public static var activeWorkspace: String { tr("dashboard.active_workspace") }
+        public static var serviceStatus: String { tr("dashboard.service_status") }
+        public static var recentActivity: String { tr("dashboard.recent_activity") }
+        public static var quickActions: String { tr("dashboard.quick_actions") }
+        public static var providerRoles: String { tr("dashboard.provider_roles") }
+        public static var workspaceNone: String { tr("dashboard.workspace.none") }
+        public static var workspaceActive: String { tr("dashboard.workspace.active") }
+        public static var workspaceInactive: String { tr("dashboard.workspace.inactive") }
+        public static var serviceRunning: String { tr("dashboard.service.running") }
+        public static var serviceStopped: String { tr("dashboard.service.stopped") }
+        public static var serviceError: String { tr("dashboard.service.error") }
+        public static var serviceUnknown: String { tr("dashboard.service.unknown") }
+        public static var statEntities: String { tr("dashboard.stat.entities") }
+        public static var statRelations: String { tr("dashboard.stat.relations") }
+        public static var statDocuments: String { tr("dashboard.stat.documents") }
+        public static var statWorkspaces: String { tr("dashboard.stat.workspaces") }
+        public static var quickSearchPlaceholder: String { tr("dashboard.quick_search_placeholder") }
+        public static var actionNewNote: String { tr("dashboard.action.new_note") }
+        public static var actionInsertDocument: String { tr("dashboard.action.insert_document") }
+        public static var actionAskQuestion: String { tr("dashboard.action.ask_question") }
+        public static var actionBrowseGraph: String { tr("dashboard.action.browse_graph") }
+        public static var activityDocumentInserted: String { tr("dashboard.activity.document_inserted") }
+        public static var activityQueryExecuted: String { tr("dashboard.activity.query_executed") }
+        public static var activitySampleML: String { tr("dashboard.activity.sample_ml") }
+        public static var activitySampleTransformers: String { tr("dashboard.activity.sample_transformers") }
+        public static var activitySampleReport: String { tr("dashboard.activity.sample_report") }
+        public static var activitySampleSummarize: String { tr("dashboard.activity.sample_summarize") }
+        public static var timeJustNow: String { tr("dashboard.time.just_now") }
+        public static func timeMinutesAgo(_ n: Int) -> String { tr("dashboard.time.minutes_ago", n) }
+        public static func timeHoursAgo(_ n: Int) -> String { tr("dashboard.time.hours_ago", n) }
+        public static func timeDaysAgo(_ n: Int) -> String { tr("dashboard.time.days_ago", n) }
+        public static var serviceNameOllama: String { tr("dashboard.service_name.ollama") }
+        public static var serviceNameLightRAG: String { tr("dashboard.service_name.lightrag") }
+
+        public static var chromeOverview: String { tr("dashboard.chrome.overview") }
+        public static var chromeOllamaOn: String { tr("dashboard.chrome.ollama_on") }
+        public static var chromeOllamaOff: String { tr("dashboard.chrome.ollama_off") }
+        public static var chromeLightRAGOn: String { tr("dashboard.chrome.lightrag_on") }
+        public static var chromeLightRAGOff: String { tr("dashboard.chrome.lightrag_off") }
+        public static var chromeNewChat: String { tr("dashboard.chrome.new_chat") }
+        public static var chromeIndexFolder: String { tr("dashboard.chrome.index_folder") }
+        public static var metricTagTotal: String { tr("dashboard.metric.tag.total") }
+        public static var metricTagLinked: String { tr("dashboard.metric.tag.linked") }
+        public static var metricTagStored: String { tr("dashboard.metric.tag.stored") }
+        public static var metricTagActive: String { tr("dashboard.metric.tag.active") }
+        public static var metricCaptionEntities: String { tr("dashboard.metric.caption.entities") }
+        public static var metricCaptionRelations: String { tr("dashboard.metric.caption.relations") }
+        public static var metricCaptionDocuments: String { tr("dashboard.metric.caption.documents") }
+        public static var metricCaptionWorkspaces: String { tr("dashboard.metric.caption.workspaces") }
+        public static var workspaceSectionActive: String { tr("dashboard.workspace.section_active") }
+        public static var workspaceResume: String { tr("dashboard.workspace.resume") }
+        public static var workspaceSettingsLink: String { tr("dashboard.workspace.settings_link") }
+        public static var workspaceBlurb: String { tr("dashboard.workspace.blurb") }
+        public static var workspaceBlurbEmpty: String { tr("dashboard.workspace.blurb_empty") }
+        public static var activityViewFullLog: String { tr("dashboard.activity.view_full_log") }
+        public static var footerE2E: String { tr("dashboard.footer.e2e") }
+        public static var footerLocalInference: String { tr("dashboard.footer.local_inference") }
+        public static var footerSQLite: String { tr("dashboard.footer.sqlite") }
+        public static func timeShortMinutes(_ n: Int) -> String { tr("dashboard.time.short_minutes", n) }
+        public static func timeShortHours(_ n: Int) -> String { tr("dashboard.time.short_hours", n) }
+
+        public static func providerRole(_ id: String) -> String {
+            switch id {
+            case "embedding": return tr("dashboard.role.embedding")
+            case "extraction": return tr("dashboard.role.extraction")
+            case "reranking": return tr("dashboard.role.reranking")
+            case "generation": return tr("dashboard.role.generation")
+            default: return id
+            }
+        }
+    }
+
+    // MARK: - App menu (main menu)
+
+    public enum AppMenu {
+        public static var quit: String { tr("app.menu.quit") }
+        public static var sectionTitle: String { tr("app.menu.section") }
+        public static var quickSearch: String { tr("app.menu.quick_search") }
+        public static var newNote: String { tr("app.menu.new_note") }
+        public static var settings: String { tr("app.menu.settings") }
     }
 
     // MARK: - Chat
@@ -194,12 +327,12 @@ public final class L10n: Sendable {
     // MARK: - Helpers
 
     private static func tr(_ key: String) -> String {
-        NSLocalizedString(key, bundle: bundle, comment: "")
+        NSLocalizedString(key, bundle: localizedStringsBundle(), comment: "")
     }
 
     /// Formatted localized string
     public static func tr(_ key: String, _ args: CVarArg...) -> String {
-        let format = NSLocalizedString(key, bundle: bundle, comment: "")
+        let format = NSLocalizedString(key, bundle: localizedStringsBundle(), comment: "")
         return String(format: format, arguments: args)
     }
 }
