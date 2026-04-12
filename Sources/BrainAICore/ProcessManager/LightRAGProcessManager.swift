@@ -84,7 +84,12 @@ public actor LightRAGProcessManager: ManagedProcess {
         env["LIGHTRAG_PORT"] = "\(port)"
         env["PYTHONUNBUFFERED"] = "1"
 
-        // Merge custom environment variables
+        // Presets from app language + provider settings (SUMMARY_LANGUAGE, chunking, Ollama hosts, etc.)
+        for (key, value) in AppConfiguration.shared.lightRAGServerEnvironment(port: port) {
+            env[key] = value
+        }
+
+        // Merge custom environment variables (caller wins)
         for (key, value) in environmentVariables {
             env[key] = value
         }

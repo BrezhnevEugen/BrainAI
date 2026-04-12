@@ -185,23 +185,23 @@ public final class AppConfiguration: @unchecked Sendable {
 
         self.embeddingRole = RoleConfig(
             providerID: "ollama",
-            modelID: "nomic-embed-text",
+            modelID: LightRAGLocalePreset.defaultEmbeddingModelIDForSystemLocale(),
             endpoint: .local
         )
         self.extractionRole = RoleConfig(
             providerID: "ollama",
-            modelID: "mistral",
+            modelID: LightRAGLocalePreset.defaultOllamaChatModelID,
             endpoint: .local
         )
         self.rerankerRole = nil
         self.generationRole = RoleConfig(
             providerID: "ollama",
-            modelID: "mistral",
+            modelID: LightRAGLocalePreset.defaultOllamaChatModelID,
             endpoint: .local
         )
 
         self.ollamaPort = 11434
-        self.ollamaKeepAlive = .minutes(5)
+        self.ollamaKeepAlive = .forever
         self.remoteOllamaURL = nil
 
         self.openAIBaseURL = nil
@@ -211,8 +211,8 @@ public final class AppConfiguration: @unchecked Sendable {
         self.language = .system
         self.theme = .system
 
-        self.chunkSize = 1200
-        self.chunkOverlap = 100
+        self.chunkSize = LightRAGLocalePreset.defaultChunkSize
+        self.chunkOverlap = LightRAGLocalePreset.defaultChunkOverlap
 
         loadFromUserDefaults()
     }
@@ -382,12 +382,12 @@ public final class AppConfiguration: @unchecked Sendable {
         // Knowledge graph settings
         chunkSize = defaults.integer(forKey: Key.chunkSize.rawValue)
         if chunkSize == 0 {
-            chunkSize = 1200
+            chunkSize = LightRAGLocalePreset.defaultChunkSize
         }
 
         chunkOverlap = defaults.integer(forKey: Key.chunkOverlap.rawValue)
         if chunkOverlap == 0 {
-            chunkOverlap = 100
+            chunkOverlap = LightRAGLocalePreset.defaultChunkOverlap
         }
     }
 
@@ -396,6 +396,66 @@ public final class AppConfiguration: @unchecked Sendable {
     /// Manually save configuration to UserDefaults
     public func save() {
         saveToUserDefaults()
+    }
+
+    // MARK: - LightRAG server (env presets)
+
+    /// Value for LightRAG `SUMMARY_LANGUAGE`, derived from app language (see `LightRAGLocalePreset`).
+    public var lightRAGSummaryLanguage: String {
+        LightRAGLocalePreset.summaryLanguage(for: language)
+    }
+
+    /// Environment variables merged into the LightRAG server process (with later overrides winning).
+    /// Universal: `SUMMARY_LANGUAGE` (from UI locale), chunking, graph cap, listen address.
+    /// Ollama-specific keys are added only when **both** generation and embedding roles use the `ollama` provider.
+    public func lightRAGServerEnvironment(port: UInt16) -> [String: String] {
+        var env: [String: String] = [
+            "HOST": "0.0.0.0",
+            "PORT": "\(port)",
+            "LIGHTRAG_PORT": "\(port)",
+            "SUMMARY_LANGUAGE": lightRAGSummaryLanguage,
+            "CHUNK_SIZE": "\(chunkSize)",
+            "CHUNK_OVERLAP": "\(chunkOverlap)",
+            "MAX_GRAPH_NODES": "5000",
+        ]
+
+        if generationRole.providerID == ProviderType.ollama.rawValue {
+            env["OLLAMA_KEEP_ALIVE"] = ollamaKeepAlive.rawValue
+        }
+
+        let ollamaLLM = generationRole.providerID == ProviderType.ollama.rawValue
+        let ollamaEmb = embeddingRole.providerID == ProviderType.ollama.rawValue
+        if ollamaLLM, ollamaEmb {
+            let ollamaHost: String
+            if let remote = remoteOllamaURL {
+                var s = remote.absoluteString
+                while s.hasSuffix("/") { s.removeLast() }
+                ollamaHost = s
+            } else {
+                ollamaHost = "http://127.0.0.1:\(ollamaPort)"
+            }
+            env["LLM_BINDING"] = "ollama"
+            env["LLM_BINDING_HOST"] = ollamaHost
+            env["EMBEDDING_BINDING"] = "ollama"
+            env["EMBEDDING_BINDING_HOST"] = ollamaHost
+            env["LLM_MODEL"] = generationRole.modelID
+            env["EMBEDDING_MODEL"] = embeddingRole.modelID
+            env["MAX_ASYNC"] = "4"
+            env["MAX_PARALLEL_INSERT"] = "2"
+            env["LLM_TIMEOUT"] = "300"
+            env["EMBEDDING_TIMEOUT"] = "300"
+            env["OLLAMA_LLM_NUM_CTX"] = "32768"
+            env["OLLAMA_EMBEDDING_NUM_CTX"] = "8192"
+
+            let mid = embeddingRole.modelID.lowercased()
+            if mid.contains("bge-m3") || mid.contains("bge_m3") {
+                env["EMBEDDING_DIM"] = "1024"
+            } else if mid.contains("nomic") {
+                env["EMBEDDING_DIM"] = "768"
+            }
+        }
+
+        return env
     }
 
     // MARK: - UserDefaults Keys

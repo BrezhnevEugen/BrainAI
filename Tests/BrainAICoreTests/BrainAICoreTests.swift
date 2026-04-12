@@ -49,6 +49,25 @@ final class AppConfigurationTests: XCTestCase {
     }
 }
 
+// MARK: - LightRAGLocalePresetTests
+
+final class LightRAGLocalePresetTests: XCTestCase {
+    func testSummaryLanguageMatchesUILocaleChoices() {
+        XCTAssertEqual(LightRAGLocalePreset.summaryLanguage(for: .en), "English")
+        XCTAssertEqual(LightRAGLocalePreset.summaryLanguage(for: .ru), "Russian")
+        XCTAssertEqual(LightRAGLocalePreset.summaryLanguage(for: .uk), "Ukrainian")
+    }
+
+    func testDefaultChunkPresetStable() {
+        XCTAssertEqual(LightRAGLocalePreset.defaultChunkSize, 800)
+        XCTAssertEqual(LightRAGLocalePreset.defaultChunkOverlap, 100)
+    }
+
+    func testDefaultChatModelPreset() {
+        XCTAssertEqual(LightRAGLocalePreset.defaultOllamaChatModelID, "qwen2.5:14b")
+    }
+}
+
 // MARK: - DTOTests
 
 final class DTOTests: XCTestCase {
