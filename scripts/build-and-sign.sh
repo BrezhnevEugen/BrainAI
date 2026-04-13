@@ -121,17 +121,16 @@ assemble_app() {
   cp "$src_macho" "$app_path/Contents/MacOS/$exec_in_macos"
   chmod +x "$app_path/Contents/MacOS/$exec_in_macos"
   rm -rf "$app_path/Contents/MacOS/Sparkle.framework" \
-    "$app_path/BrainAI_BrainAICore.bundle" \
-    "$app_path/BrainAI_BrainAIInstaller.bundle"
+    "$app_path/Contents/Resources/BrainAI_BrainAICore.bundle" \
+    "$app_path/Contents/Resources/BrainAI_BrainAIInstaller.bundle"
   cp -R "$SPARKLE_FW" "$app_path/Contents/MacOS/"
 
-  # SPM resource bundles: Bundle.module looks at Bundle.main.bundleURL (= <app>/),
-  # NOT Contents/MacOS/. Place them at the .app root so the auto-generated
-  # resource_bundle_accessor.swift finds them on any machine (the hardcoded
-  # build-path fallback only works on the dev machine).
-  cp -R "$RES_BUNDLE" "$app_path/"
+  # SPM resource bundles: в .app кладём только в Contents/Resources (codesign). Загрузка в рантайме —
+  # см. BrainAICoreResources / InstallerL10n (путь Contents/Resources/BrainAI_*).
+  mkdir -p "$app_path/Contents/Resources"
+  cp -R "$RES_BUNDLE" "$app_path/Contents/Resources/"
   if [[ "$exec_in_macos" == "BrainAIInstaller" ]]; then
-    cp -R "$INSTALLER_RES_BUNDLE" "$app_path/"
+    cp -R "$INSTALLER_RES_BUNDLE" "$app_path/Contents/Resources/"
   fi
 
   local info="$app_path/Contents/Info.plist"
@@ -197,6 +196,13 @@ if [[ -f "$ROOT/README.md" ]]; then
   fi
 fi
 
+# com.apple.provenance (и др. xattr после cp -R) даёт «unsealed contents present in the bundle root».
+strip_bundle_xattrs() {
+  local target="$1"
+  [[ -d "$target" ]] || return 0
+  xattr -cr "$target" 2>/dev/null || true
+}
+
 sign_if_needed() {
   local target="$1"
   if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
@@ -241,14 +247,13 @@ sign_app() {
   if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
     return 0
   fi
+  strip_bundle_xattrs "$app"
   local fw="$app/Contents/MacOS/Sparkle.framework"
-  # SPM resource bundles now live at the .app root (Bundle.main.bundleURL).
-  local rb="$app/BrainAI_BrainAICore.bundle"
-  local inst_rb="$app/BrainAI_BrainAIInstaller.bundle"
+  local rb="$app/Contents/Resources/BrainAI_BrainAICore.bundle"
+  local inst_rb="$app/Contents/Resources/BrainAI_BrainAIInstaller.bundle"
   [[ -d "$fw" ]] && sign_sparkle_framework "$fw"
   [[ -d "$rb" ]] && sign_if_needed "$rb"
   [[ -d "$inst_rb" ]] && sign_if_needed "$inst_rb"
-  # Sign each Mach-O inside MacOS (executable only; avoid re-signing framework copies)
   local m="$app/Contents/MacOS"
   local f
   for f in "$m"/*; do

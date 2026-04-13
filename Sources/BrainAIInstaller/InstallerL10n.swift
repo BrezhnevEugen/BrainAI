@@ -1,12 +1,24 @@
 import Foundation
 
-/// Strings for BrainAI Installer (`Localizable.strings` in `Resources`, `Bundle.module`).
+/// Strings for BrainAI Installer (`Localizable.strings` в SPM-модуле; в `.app` — `Contents/Resources/BrainAI_BrainAIInstaller.bundle`).
 enum InstallerL10n {
+
+    private static let installerResourcesBundle: Bundle = {
+        let packaged = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/BrainAI_BrainAIInstaller.bundle")
+        if FileManager.default.fileExists(atPath: packaged.path), let b = Bundle(url: packaged) {
+            return b
+        }
+        let atRoot = Bundle.main.bundleURL.appendingPathComponent("BrainAI_BrainAIInstaller.bundle")
+        if FileManager.default.fileExists(atPath: atRoot.path), let b = Bundle(url: atRoot) {
+            return b
+        }
+        return Bundle.module
+    }()
 
     /// SPM resource bundles often ship without `CFBundleLocalizations`. Then `NSLocalizedString(..., bundle: .module)`
     /// keeps the development language (en) even when the system is `ru`. Resolve a concrete `.lproj` inside the module bundle.
     private static let stringsBundle: Bundle = {
-        let base = Bundle.module
+        let base = installerResourcesBundle
         var seen = Set<String>()
         var codes: [String] = []
         for id in Locale.preferredLanguages {
