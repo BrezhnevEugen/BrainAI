@@ -9,7 +9,7 @@
 #   VERSION=0.2.0 ./scripts/build-and-sign.sh
 #   Из корня монорепо: ../scripts/build-and-sign.sh (см. обёртку; задайте DIST при необходимости)
 #   CODESIGN_IDENTITY="Developer ID Application: …" ./scripts/build-and-sign.sh
-#   NOTARIZE=1 NOTARY_KEYCHAIN_PROFILE=… ./scripts/build-and-sign.sh
+#   NOTARIZE=1 NOTARY_KEYCHAIN_PROFILE="…"   # или APPLE_ID + NOTARIZE_PASSWORD + TEAM_ID (или APPLE_TEAM_ID)
 #
 # Optional DMG layout: all .app bundles inside one folder (single drag into /Applications):
 #   DMG_SUITE_FOLDER=1 ./scripts/build-and-sign.sh
@@ -23,7 +23,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:-${VERSION:-0.1.5}}"
+VERSION="${1:-${VERSION:-0.1.6}}"
 CONFIG="${CONFIG:-release}"
 DIST="${DIST:-$ROOT/dist}"
 STAGE="$DIST/stage/BrainAI-$VERSION"
@@ -292,14 +292,23 @@ if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
 fi
 
 if [[ "${NOTARIZE:-0}" == "1" ]]; then
-  if [[ -z "${NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
-    echo "NOTARIZE=1 requires NOTARY_KEYCHAIN_PROFILE (notarytool store-credentials)." >&2
+  _team="${TEAM_ID:-${APPLE_TEAM_ID:-}}"
+  if [[ -n "${APPLE_ID:-}" && -n "${NOTARIZE_PASSWORD:-}" && -n "$_team" ]]; then
+    echo "==> notarytool submit (Apple ID + app-specific password, wait)"
+    xcrun notarytool submit "$DMG_PATH" \
+      --apple-id "$APPLE_ID" \
+      --password "$NOTARIZE_PASSWORD" \
+      --team-id "$_team" \
+      --wait
+  elif [[ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
+    echo "==> notarytool submit (keychain profile: $NOTARY_KEYCHAIN_PROFILE, wait)"
+    xcrun notarytool submit "$DMG_PATH" \
+      --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
+      --wait
+  else
+    echo "NOTARIZE=1 requires NOTARY_KEYCHAIN_PROFILE or APPLE_ID + NOTARIZE_PASSWORD + TEAM_ID (or APPLE_TEAM_ID)." >&2
     exit 1
   fi
-  echo "==> notarytool submit (wait)"
-  xcrun notarytool submit "$DMG_PATH" \
-    --keychain-profile "$NOTARY_KEYCHAIN_PROFILE" \
-    --wait
   xcrun stapler staple "$DMG_PATH"
 fi
 

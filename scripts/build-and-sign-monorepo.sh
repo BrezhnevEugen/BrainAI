@@ -21,7 +21,7 @@ if [[ ! -f "$INNER" ]]; then
   exit 1
 fi
 
-export VERSION="${1:-${VERSION:-0.1.5}}"
+export VERSION="${1:-${VERSION:-0.1.6}}"
 SKIP_SIGNING="${SKIP_SIGNING:-false}"
 SKIP_NOTARIZE="${SKIP_NOTARIZE:-false}"
 export DIST="${DIST:-$REPO_ROOT/dist}"
@@ -32,8 +32,12 @@ else
   export CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-${SIGNING_IDENTITY:-Developer ID Application}}"
 fi
 
-if [[ "$SKIP_NOTARIZE" == "true" ]] || [[ "$SKIP_SIGNING" == "true" ]]; then
+if [[ "$SKIP_SIGNING" == "true" ]]; then
   export NOTARIZE=0
+elif [[ "$SKIP_NOTARIZE" == "true" ]]; then
+  export NOTARIZE=0
+else
+  export NOTARIZE="${NOTARIZE:-1}"
 fi
 
 echo "=== BrainAI Build & Package (monorepo layout) ==="
@@ -42,6 +46,7 @@ echo "Package: $PACKAGE_ROOT"
 echo "Dist:    $DIST"
 echo "Skip signing: $SKIP_SIGNING"
 echo "Skip notarize: $SKIP_NOTARIZE"
+echo "NOTARIZE: ${NOTARIZE:-0}"
 echo ""
 
 exec bash "$INNER"
