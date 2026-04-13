@@ -334,6 +334,8 @@ struct DashboardView: View {
                         } label: {
                             Text(L10n.Dashboard.workspaceResume)
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 9)
                         }
@@ -345,19 +347,45 @@ struct DashboardView: View {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .stroke(SynapseColor.outlineVariant.opacity(0.25), lineWidth: 1)
                         )
+                        .fixedSize(horizontal: true, vertical: false)
 
                         Button {
                             BrainAICompanionAppLauncher.openSettings()
                         } label: {
                             Text(L10n.Dashboard.workspaceSettingsLink)
                                 .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(SynapseColor.primary)
+                        .fixedSize(horizontal: true, vertical: false)
 
                         Spacer(minLength: 0)
                     }
                     .padding(.top, 4)
+
+                    if !viewModel.isWorkspaceActive {
+                        Button {
+                            NotificationCenter.default.post(name: .brainAIOpenSetupWizard, object: nil)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wand.and.stars")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text(L10n.Nav.setupWizard)
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SynapseColor.onPrimaryFixed)
+                        .background(SynapseStyle.primaryCTAGradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.top, 6)
+                    }
                 }
                 .padding(22)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -557,8 +585,8 @@ private struct DashboardOverviewChrome: View {
     var onSearchSubmit: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 12) {
+        HStack(alignment: .center, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
                 Text(L10n.Dashboard.chromeOverview.uppercased())
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(0.8)
@@ -576,7 +604,7 @@ private struct DashboardOverviewChrome: View {
 
             Spacer(minLength: 12)
 
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 12, weight: .medium))
@@ -585,11 +613,14 @@ private struct DashboardOverviewChrome: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(SynapseColor.onSurface)
-                        .frame(minWidth: 140, maxWidth: 220)
+                        .lineLimit(1)
+                        .frame(minWidth: 140, maxWidth: 220, maxHeight: 22, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .onSubmit { onSearchSubmit() }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
+                .fixedSize(horizontal: false, vertical: true)
                 .background(SynapseColor.surfaceContainerLowest)
                 .clipShape(Capsule(style: .continuous))
                 .overlay(
@@ -607,6 +638,7 @@ private struct DashboardOverviewChrome: View {
                             .font(.system(size: 12, weight: .semibold))
                         Text(L10n.Dashboard.chromeNewChat)
                             .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .lineLimit(1)
                     }
                     .foregroundStyle(SynapseColor.onPrimaryFixed)
                     .padding(.horizontal, 14)
@@ -615,6 +647,7 @@ private struct DashboardOverviewChrome: View {
                     .shadow(color: SynapseColor.primary.opacity(0.2), radius: 8, y: 2)
                 }
                 .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: true)
 
                 Button(action: onIndexFolder) {
                     HStack(spacing: 6) {
@@ -622,6 +655,7 @@ private struct DashboardOverviewChrome: View {
                             .font(.system(size: 12, weight: .medium))
                         Text(L10n.Dashboard.chromeIndexFolder)
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .lineLimit(1)
                     }
                     .foregroundStyle(SynapseColor.onSurfaceVariant)
                     .padding(.horizontal, 12)
@@ -634,8 +668,12 @@ private struct DashboardOverviewChrome: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: true)
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
         .background(.bar)

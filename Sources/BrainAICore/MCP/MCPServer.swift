@@ -142,7 +142,7 @@ public actor MCPServer {
         MCPResponse(
             id: request.id,
             result: MCPResult(content: [
-                MCPContent(text: "{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"BrainAI\",\"version\":\"0.1.0\"}}")
+                MCPContent(text: "{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"BrainAI\",\"version\":\"\(BrainAIMetadata.marketingVersion)\"}}")
             ])
         )
     }

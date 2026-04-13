@@ -31,6 +31,7 @@
 "nav.notes" = "Notes";
 "nav.graph" = "Knowledge Graph";
 "nav.settings" = "Settings";
+"nav.setup_wizard" = "Setup wizard";
 
 /* Chat */
 "chat.placeholder" = "Ask a question...";
@@ -72,6 +73,7 @@
 "settings.workspaces" = "Workspaces";
 "settings.advanced" = "Advanced";
 "settings.language" = "Language";
+"settings.language.follow_system" = "Same as macOS";
 "settings.theme" = "Theme";
 "settings.check_updates" = "Check for Updates";
 "settings.auto_updates" = "Automatically Check for Updates";
@@ -216,4 +218,4 @@
 "app.menu.settings" = "Settings…";
 "app.menu.setup_wizard" = "First-Time Setup Wizard…";
 "app.menu.setup_wizard_missing_title" = "Setup app not found";
-"app.menu.setup_wizard_missing_body" = "This copy of BrainAI does not include the installer inside the app bundle. Use the full disk image with DMG_SINGLE_APP=1, or run BrainAI Installer from the same folder as BrainAI.";
+"app.menu.setup_wizard_missing_body" = "BrainAI could not find BrainAI Installer.app next to BrainAI.app (same folder) or inside the app (embedded layout). Use the full DMG, place both apps in the same folder, or build with DMG_SINGLE_APP=1.";

@@ -14,10 +14,18 @@ public enum LightRAGLocalePreset {
             return "Russian"
         case .uk:
             return "Ukrainian"
+        case .de, .fr, .it, .es, .pl:
+            return "English"
+        case .zhHans:
+            return "Chinese"
+        case .ja:
+            return "Japanese"
         case .system:
             let code = Locale.current.language.languageCode?.identifier ?? ""
             if code.hasPrefix("ru") { return "Russian" }
             if code.hasPrefix("uk") { return "Ukrainian" }
+            if code.hasPrefix("zh") { return "Chinese" }
+            if code.hasPrefix("ja") { return "Japanese" }
             return "English"
         }
     }
@@ -25,7 +33,7 @@ public enum LightRAGLocalePreset {
     /// Prefer **bge-m3** for RU/UA system locales; **nomic-embed-text** otherwise (lighter, universal).
     public static func defaultEmbeddingModelIDForSystemLocale() -> String {
         let code = Locale.current.language.languageCode?.identifier ?? ""
-        if code.hasPrefix("ru") || code.hasPrefix("uk") {
+        if code.hasPrefix("ru") || code.hasPrefix("uk") || code.hasPrefix("zh") {
             return "bge-m3"
         }
         return "nomic-embed-text"

@@ -15,11 +15,16 @@ struct GeneralTab: View {
         Form {
             // MARK: - Appearance
             Section {
-                Picker("Language", selection: $config.language) {
-                    Text("System").tag(AppLanguage.system)
-                    Text("English").tag(AppLanguage.en)
-                    Text("Russian").tag(AppLanguage.ru)
-                    Text("Ukrainian").tag(AppLanguage.uk)
+                Picker(L10n.Settings.language, selection: $config.language) {
+                    Text(L10n.Settings.languageFollowSystem).tag(AppLanguage.system)
+                    ForEach(
+                        [AppLanguage.en, .ru, .uk, .de, .fr, .it, .es, .pl, .zhHans, .ja],
+                        id: \.self
+                    ) { lang in
+                        let id = lang.rawValue
+                        Text(Locale.autoupdatingCurrent.localizedString(forIdentifier: id) ?? id)
+                            .tag(lang)
+                    }
                 }
 
                 Picker("Theme", selection: $config.theme) {
@@ -156,7 +161,7 @@ struct GeneralTab: View {
     // MARK: - Private
 
     private var appVersion: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? BrainAIMetadata.marketingVersion
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
     }

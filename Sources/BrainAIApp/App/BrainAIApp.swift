@@ -53,13 +53,23 @@ struct BrainAIAppContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedTab) {
-                ForEach(SidebarSection.allCases, id: \.self) { section in
-                    Label(section.title, systemImage: section.systemImage)
-                        .tag(Optional(section))
+                Section {
+                    ForEach(SidebarSection.allCases, id: \.self) { section in
+                        sidebarNavLabel(title: section.title, systemImage: section.systemImage)
+                            .tag(Optional(section))
+                    }
+                }
+                Section {
+                    Button {
+                        NotificationCenter.default.post(name: .brainAIOpenSetupWizard, object: nil)
+                    } label: {
+                        sidebarNavLabel(title: L10n.Nav.setupWizard, systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 260)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 248, max: 420)
         } detail: {
             detailView
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,6 +104,19 @@ struct BrainAIAppContentView: View {
             selectedTab = .settings
         }
         .id(config.language)
+    }
+
+    /// Подписи сайдбара: до двух строк и лёгкое сжатие, чтобы длинные локали не обрезались с «…».
+    @ViewBuilder
+    private func sidebarNavLabel(title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+                .lineLimit(2)
+                .minimumScaleFactor(0.88)
+                .multilineTextAlignment(.leading)
+        } icon: {
+            Image(systemName: systemImage)
+        }
     }
 
     // MARK: - Detail View

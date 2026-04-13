@@ -69,7 +69,7 @@ Storage is always local. Compute is your choice.
 
 ### Installer (recommended)
 
-Download `BrainAI-Installer.dmg` from [Releases](https://github.com/BrezhnevEugen/BrainAI/releases). The installer detects existing components, downloads only what's missing, and configures everything.
+Download the DMG from [Releases](https://github.com/BrezhnevEugen/BrainAI/releases). The installer detects existing components, downloads only what's missing, and configures everything.
 
 ### Manual
 

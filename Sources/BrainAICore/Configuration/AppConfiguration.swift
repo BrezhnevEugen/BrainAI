@@ -9,6 +9,14 @@ public enum AppLanguage: String, Codable, Sendable, Hashable, CaseIterable {
     case en
     case ru
     case uk
+    case de
+    case fr
+    case it
+    case es
+    case pl
+    /// Simplified Chinese (matches `zh-Hans.lproj`).
+    case zhHans = "zh-Hans"
+    case ja
 }
 
 // MARK: - App Theme

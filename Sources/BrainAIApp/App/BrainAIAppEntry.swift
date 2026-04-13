@@ -5,6 +5,8 @@ import BrainAICore
 // MARK: - Notifications (menu → SwiftUI)
 
 extension Notification.Name {
+    /// Открыть мастер начальной настройки (тот же сценарий, что пункт меню приложения).
+    static let brainAIOpenSetupWizard = Notification.Name("com.brainai.app.openSetupWizard")
     static let brainAIQuickSearch = Notification.Name("com.brainai.app.quickSearch")
     static let brainAINewNote = Notification.Name("com.brainai.app.newNote")
     static let brainAIOpenGraph = Notification.Name("com.brainai.app.openGraph")
@@ -41,6 +43,12 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         shouldOpenSettingsAfterLaunch = ProcessInfo.processInfo.arguments.contains("--open-settings")
         UserNotificationService.shared.configure()
         setupMainMenu()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openSetupWizard),
+            name: .brainAIOpenSetupWizard,
+            object: nil
+        )
         distributedOpenSettingsObserver = DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("com.brainai.OpenSettings"),
             object: nil,
@@ -81,6 +89,12 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         self.window = window
 
+        // SwiftUI после установки NSHostingController может заменить mainMenu — восстанавливаем своё меню.
+        setupMainMenu()
+        DispatchQueue.main.async { [weak self] in
+            self?.setupMainMenu()
+        }
+
         if shouldOpenSettingsAfterLaunch {
             shouldOpenSettingsAfterLaunch = false
             NotificationCenter.default.post(name: .brainAIOpenSettings, object: nil)
@@ -89,26 +103,32 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
 
     private func setupMainMenu() {
         let mainMenu = NSMenu()
+        let appTitle = L10n.Common.appName
 
+        // Первое меню в строке меню — меню приложения (как в стандартных macOS-приложениях):
+        // без заголовка у первого NSMenuItem пункты «Мастер настройки» и др. не видны как часть приложения.
         let appItem = NSMenuItem()
+        appItem.title = appTitle
         mainMenu.addItem(appItem)
-        let appMenu = NSMenu()
+
+        let appMenu = NSMenu(title: appTitle)
         appItem.submenu = appMenu
-        appMenu.addItem(
-            withTitle: L10n.AppMenu.quit,
+
+        appMenu.addItem(makeMenuItem(title: L10n.AppMenu.quickSearch, action: #selector(quickSearch), key: "k"))
+        appMenu.addItem(makeMenuItem(title: L10n.AppMenu.newNote, action: #selector(newNote), key: "n"))
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(makeMenuItem(title: L10n.AppMenu.setupWizard, action: #selector(openSetupWizard), key: ""))
+        appMenu.addItem(makeMenuItem(title: L10n.AppMenu.settings, action: #selector(openSettings), key: ","))
+        appMenu.addItem(NSMenuItem.separator())
+
+        let quitItem = NSMenuItem(
+            title: L10n.AppMenu.quit,
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
-
-        let brainItem = NSMenuItem(title: L10n.AppMenu.sectionTitle, action: nil, keyEquivalent: "")
-        let brainMenu = NSMenu(title: L10n.AppMenu.sectionTitle)
-        brainItem.submenu = brainMenu
-        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.quickSearch, action: #selector(quickSearch), key: "k"))
-        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.newNote, action: #selector(newNote), key: "n"))
-        brainMenu.addItem(NSMenuItem.separator())
-        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.setupWizard, action: #selector(openSetupWizard), key: ""))
-        brainMenu.addItem(makeMenuItem(title: L10n.AppMenu.settings, action: #selector(openSettings), key: ","))
-        mainMenu.addItem(brainItem)
+        quitItem.target = NSApp
+        quitItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(quitItem)
 
         NSApp.mainMenu = mainMenu
     }

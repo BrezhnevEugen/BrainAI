@@ -12,6 +12,9 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertEqual(AppLanguage.system.rawValue, "system")
         XCTAssertEqual(AppLanguage.en.rawValue, "en")
         XCTAssertEqual(AppLanguage.ru.rawValue, "ru")
+        XCTAssertEqual(AppLanguage.uk.rawValue, "uk")
+        XCTAssertEqual(AppLanguage.zhHans.rawValue, "zh-Hans")
+        XCTAssertEqual(AppLanguage.allCases.count, 11)
     }
 
     func testKeepAliveDuration() {

@@ -31,6 +31,7 @@
 "nav.notes" = "Нотатки";
 "nav.graph" = "Граф знань";
 "nav.settings" = "Налаштування";
+"nav.setup_wizard" = "Майстер налаштування";
 
 /* Chat */
 "chat.placeholder" = "Поставте запитання...";
@@ -72,6 +73,7 @@
 "settings.workspaces" = "Робочі простори";
 "settings.advanced" = "Розширені";
 "settings.language" = "Мова";
+"settings.language.follow_system" = "Як у macOS";
 "settings.theme" = "Тема оформлення";
 "settings.check_updates" = "Перевірити оновлення";
 "settings.auto_updates" = "Перевіряти оновлення автоматично";
@@ -215,4 +217,4 @@
 "app.menu.settings" = "Налаштування…";
 "app.menu.setup_wizard" = "Майстер початкового налаштування…";
 "app.menu.setup_wizard_missing_title" = "Інсталятор не знайдено";
-"app.menu.setup_wizard_missing_body" = "У цій копії BrainAI немає вбудованого інсталятора (потрібна збірка з DMG_SINGLE_APP=1). Скористайтеся повним образом DMG або запустіть BrainAI Installer з тієї ж теки, що й BrainAI.";
+"app.menu.setup_wizard_missing_body" = "Не знайдено BrainAI Installer.app поруч із BrainAI.app (в одній теці) або всередині пакета. Покладіть обидва .app в одну теку, використайте повний DMG або зберіть з DMG_SINGLE_APP=1.";

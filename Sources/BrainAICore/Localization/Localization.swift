@@ -13,6 +13,13 @@ public final class L10n: Sendable {
         case .en: return Locale(identifier: "en")
         case .ru: return Locale(identifier: "ru")
         case .uk: return Locale(identifier: "uk")
+        case .de: return Locale(identifier: "de")
+        case .fr: return Locale(identifier: "fr")
+        case .it: return Locale(identifier: "it")
+        case .es: return Locale(identifier: "es")
+        case .pl: return Locale(identifier: "pl")
+        case .zhHans: return Locale(identifier: "zh-Hans")
+        case .ja: return Locale(identifier: "ja")
         }
     }
 
@@ -28,12 +35,20 @@ public final class L10n: Sendable {
         switch AppConfiguration.shared.language {
         case .system:
             if let first = Locale.preferredLanguages.first {
+                if first.hasPrefix("zh") { return "zh-Hans" }
                 return String(first.prefix(while: { $0 != "-" && $0 != "_" }))
             }
             return "en"
         case .en: return "en"
         case .ru: return "ru"
         case .uk: return "uk"
+        case .de: return "de"
+        case .fr: return "fr"
+        case .it: return "it"
+        case .es: return "es"
+        case .pl: return "pl"
+        case .zhHans: return "zh-Hans"
+        case .ja: return "ja"
         }
     }
 
@@ -94,6 +109,8 @@ public final class L10n: Sendable {
         public static var notes: String { tr("nav.notes") }
         public static var graph: String { tr("nav.graph") }
         public static var settings: String { tr("nav.settings") }
+        /// Короткая подпись для сайдбара и панелей (меню приложения — `AppMenu.setupWizard`).
+        public static var setupWizard: String { tr("nav.setup_wizard") }
     }
 
     // MARK: - Dashboard
@@ -245,6 +262,7 @@ public final class L10n: Sendable {
         public static var workspaces: String { tr("settings.workspaces") }
         public static var advanced: String { tr("settings.advanced") }
         public static var language: String { tr("settings.language") }
+        public static var languageFollowSystem: String { tr("settings.language.follow_system") }
         public static var theme: String { tr("settings.theme") }
         public static var checkUpdates: String { tr("settings.check_updates") }
         public static var autoUpdates: String { tr("settings.auto_updates") }
@@ -330,12 +348,14 @@ public final class L10n: Sendable {
     // MARK: - Helpers
 
     private static func tr(_ key: String) -> String {
-        NSLocalizedString(key, bundle: localizedStringsBundle(), comment: "")
+        NSLocalizedString(key, tableName: "Localizable", bundle: localizedStringsBundle(), value: key, comment: "")
     }
 
     /// Formatted localized string
     public static func tr(_ key: String, _ args: CVarArg...) -> String {
-        let format = NSLocalizedString(key, bundle: localizedStringsBundle(), comment: "")
-        return String(format: format, arguments: args)
+        let format = NSLocalizedString(key, tableName: "Localizable", bundle: localizedStringsBundle(), value: key, comment: "")
+        return withVaList(args) {
+            NSString(format: format, locale: locale, arguments: $0) as String
+        }
     }
 }

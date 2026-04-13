@@ -15,21 +15,26 @@
 #   DMG_SUITE_FOLDER=1 ./scripts/build-and-sign.sh
 #   DMG_SUITE_FOLDER=1 DMG_SUITE_FOLDER_NAME="BrainAI" ./scripts/build-and-sign.sh
 #
-# Single drag target: only BrainAI.app on the DMG; Tray, Installer, thin Settings live inside
+# Single drag target (default): only BrainAI.app on the DMG; Tray, Installer, thin Settings live inside
 #   BrainAI.app/Contents/Resources/BrainAIEmbedded/ (see Tray + BrainAICompanionAppLauncher).
-#   DMG_SINGLE_APP=1 ./scripts/build-and-sign.sh
+#   Flat DMG (four .app on disk): DMG_SINGLE_APP=0 ./scripts/build-and-sign.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:-${VERSION:-0.1.0}}"
+VERSION="${1:-${VERSION:-0.1.5}}"
 CONFIG="${CONFIG:-release}"
 DIST="${DIST:-$ROOT/dist}"
 STAGE="$DIST/stage/BrainAI-$VERSION"
 BUNDLE_ID_PREFIX="${BUNDLE_ID_PREFIX:-com.brainai}"
 SUFeedURL="${SUFeedURL:-https://github.com/BrainAI-App/BrainAI/releases/latest/download/appcast.xml}"
 
+# По умолчанию один BrainAI.app на DMG; плоская раскладка — только при DMG_SINGLE_APP=0.
+: "${DMG_SINGLE_APP:=1}"
+export DMG_SINGLE_APP
+
+echo "==> DMG layout: DMG_SINGLE_APP=$DMG_SINGLE_APP (1 = один BrainAI.app + BrainAIEmbedded, 0 = четыре .app рядом)"
 echo "==> Swift build ($CONFIG, all app products)"
 swift build -c "$CONFIG" \
   --product BrainAITray \
@@ -96,9 +101,9 @@ plist_set_bool() {
 plist_set_localizations() {
   local plist="$1"
   if plutil -extract CFBundleLocalizations xml1 "$plist" >/dev/null 2>&1; then
-    plutil -replace CFBundleLocalizations -json '["en","ru","uk"]' "$plist"
+    plutil -replace CFBundleLocalizations -json '["en","ru","uk","de","fr","it","es","pl","zh-Hans","ja"]' "$plist"
   else
-    plutil -insert CFBundleLocalizations -json '["en","ru","uk"]' "$plist"
+    plutil -insert CFBundleLocalizations -json '["en","ru","uk","de","fr","it","es","pl","zh-Hans","ja"]' "$plist"
   fi
 }
 
@@ -115,13 +120,18 @@ assemble_app() {
 
   cp "$src_macho" "$app_path/Contents/MacOS/$exec_in_macos"
   chmod +x "$app_path/Contents/MacOS/$exec_in_macos"
-  rm -rf "$app_path/Contents/MacOS/Sparkle.framework" "$app_path/Contents/MacOS/BrainAI_BrainAICore.bundle" \
-    "$app_path/Contents/MacOS/BrainAI_BrainAIInstaller.bundle"
+  rm -rf "$app_path/Contents/MacOS/Sparkle.framework" \
+    "$app_path/BrainAI_BrainAICore.bundle" \
+    "$app_path/BrainAI_BrainAIInstaller.bundle"
   cp -R "$SPARKLE_FW" "$app_path/Contents/MacOS/"
-  cp -R "$RES_BUNDLE" "$app_path/Contents/MacOS/"
-  # Installer strings live in this SPM bundle; must sit next to the Mach-O (same as swift build output).
+
+  # SPM resource bundles: Bundle.module looks at Bundle.main.bundleURL (= <app>/),
+  # NOT Contents/MacOS/. Place them at the .app root so the auto-generated
+  # resource_bundle_accessor.swift finds them on any machine (the hardcoded
+  # build-path fallback only works on the dev machine).
+  cp -R "$RES_BUNDLE" "$app_path/"
   if [[ "$exec_in_macos" == "BrainAIInstaller" ]]; then
-    cp -R "$INSTALLER_RES_BUNDLE" "$app_path/Contents/MacOS/"
+    cp -R "$INSTALLER_RES_BUNDLE" "$app_path/"
   fi
 
   local info="$app_path/Contents/Info.plist"
@@ -142,10 +152,16 @@ assemble_app() {
     plist_set_bool "$info" LSUIElement true
   fi
 
-  # So macOS treats the app as multilingual (helps locale resolution for bundled resources).
-  if [[ "$exec_in_macos" == "BrainAIInstaller" ]]; then
-    plist_set_localizations "$info"
+  # Application icon (repo: BrainAI/Resources/AppIcon.icns)
+  local icon_src="$ROOT/Resources/AppIcon.icns"
+  if [[ -f "$icon_src" ]]; then
+    mkdir -p "$app_path/Contents/Resources"
+    cp "$icon_src" "$app_path/Contents/Resources/AppIcon.icns"
+    plist_set_string "$info" CFBundleIconFile "AppIcon"
   fi
+
+  # So macOS treats the app as multilingual (helps locale resolution for bundled resources).
+  plist_set_localizations "$info"
 
   printf '%s' "APPL????" >"$app_path/Contents/PkgInfo"
 }
@@ -226,8 +242,9 @@ sign_app() {
     return 0
   fi
   local fw="$app/Contents/MacOS/Sparkle.framework"
-  local rb="$app/Contents/MacOS/BrainAI_BrainAICore.bundle"
-  local inst_rb="$app/Contents/MacOS/BrainAI_BrainAIInstaller.bundle"
+  # SPM resource bundles now live at the .app root (Bundle.main.bundleURL).
+  local rb="$app/BrainAI_BrainAICore.bundle"
+  local inst_rb="$app/BrainAI_BrainAIInstaller.bundle"
   [[ -d "$fw" ]] && sign_sparkle_framework "$fw"
   [[ -d "$rb" ]] && sign_if_needed "$rb"
   [[ -d "$inst_rb" ]] && sign_if_needed "$inst_rb"
@@ -237,8 +254,6 @@ sign_app() {
   for f in "$m"/*; do
     [[ -f "$f" ]] && [[ -x "$f" ]] || continue
     [[ "$f" == "$m/Sparkle.framework" ]] && continue
-    [[ "$f" == "$m/BrainAI_BrainAICore.bundle" ]] && continue
-    [[ "$f" == "$m/BrainAI_BrainAIInstaller.bundle" ]] && continue
     sign_if_needed "$f"
   done
   sign_if_needed "$app"

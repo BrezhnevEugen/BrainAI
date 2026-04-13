@@ -31,6 +31,7 @@
 "nav.notes" = "Заметки";
 "nav.graph" = "Граф знаний";
 "nav.settings" = "Настройки";
+"nav.setup_wizard" = "Мастер настройки";
 
 /* Chat */
 "chat.placeholder" = "Задайте вопрос...";
@@ -72,6 +73,7 @@
 "settings.workspaces" = "Рабочие области";
 "settings.advanced" = "Расширенные";
 "settings.language" = "Язык";
+"settings.language.follow_system" = "Как в macOS";
 "settings.theme" = "Тема оформления";
 "settings.check_updates" = "Проверить обновления";
 "settings.auto_updates" = "Проверять обновления автоматически";
@@ -215,4 +217,4 @@
 "app.menu.settings" = "Настройки…";
 "app.menu.setup_wizard" = "Мастер первоначальной настройки…";
 "app.menu.setup_wizard_missing_title" = "Установщик не найден";
-"app.menu.setup_wizard_missing_body" = "В этой копии BrainAI нет встроенного установщика (ожидается сборка с DMG_SINGLE_APP=1). Используйте полный образ DMG или запустите BrainAI Installer из той же папки, что и BrainAI.";
+"app.menu.setup_wizard_missing_body" = "Не найден BrainAI Installer.app рядом с BrainAI.app (в одной папке) или внутри приложения (встроенная раскладка). Положите оба .app в одну папку, используйте полный DMG или соберите с DMG_SINGLE_APP=1.";

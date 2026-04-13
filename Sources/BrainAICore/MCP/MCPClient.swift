@@ -37,7 +37,7 @@ public actor MCPClient {
                     "capabilities": .object([:]),
                     "clientInfo": .object([
                         "name": .string("BrainAI"),
-                        "version": .string("0.1.0")
+                        "version": .string(BrainAIMetadata.marketingVersion)
                     ])
                 ]
             )
