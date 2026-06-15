@@ -165,6 +165,22 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         let ollamaStatus = makeStatusItem(name: "Ollama", isRunning: ollamaRunning)
         menu.addItem(ollamaStatus)
 
+        // MCP server status (exposes memory to external agents)
+        let mcpServer = MCPWebSocketServer.shared
+        let mcpStatus = makeStatusItem(name: "MCP Server", isRunning: mcpServer.isRunning)
+        menu.addItem(mcpStatus)
+
+        if mcpServer.isRunning {
+            let detailItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+            detailItem.attributedTitle = NSAttributedString(
+                string: "  ws://localhost:\(mcpServer.port) · \(mcpServer.activeConnections) client(s)",
+                attributes: [.font: font, .foregroundColor: menuAccentTextColor(.systemGreen)]
+            )
+            markInertMenuRow(detailItem)
+            menu.addItem(detailItem)
+        }
+
         // Remote connection status
         if remoteConnected {
             let latencyMs = Int(remoteLatency * 1000)
