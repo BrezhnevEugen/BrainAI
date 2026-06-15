@@ -43,6 +43,11 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         shouldOpenSettingsAfterLaunch = ProcessInfo.processInfo.arguments.contains("--open-settings")
         UserNotificationService.shared.configure()
         setupMainMenu()
+
+        // Auto-start the in-app MCP server if the user left it enabled.
+        if AppConfiguration.shared.mcpServerEnabled {
+            try? MCPWebSocketServer.shared.start(port: UInt16(AppConfiguration.shared.mcpServerPort))
+        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(openSetupWizard),

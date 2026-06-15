@@ -112,6 +112,20 @@ public final class AppConfiguration: @unchecked Sendable {
         }
     }
 
+    /// Port for the in-app MCP WebSocket server
+    public var mcpServerPort: Int {
+        didSet {
+            saveToUserDefaults()
+        }
+    }
+
+    /// Whether the in-app MCP WebSocket server should run (and auto-start on launch)
+    public var mcpServerEnabled: Bool {
+        didSet {
+            saveToUserDefaults()
+        }
+    }
+
     /// URL for remote Ollama instance (if using remote)
     public var remoteOllamaURL: URL? {
         didSet {
@@ -210,6 +224,8 @@ public final class AppConfiguration: @unchecked Sendable {
 
         self.ollamaPort = 11434
         self.ollamaKeepAlive = .forever
+        self.mcpServerPort = 8765
+        self.mcpServerEnabled = false
         self.remoteOllamaURL = nil
 
         self.openAIBaseURL = nil
@@ -263,6 +279,8 @@ public final class AppConfiguration: @unchecked Sendable {
 
             defaults.set(ollamaPort, forKey: Key.ollamaPort.rawValue)
             defaults.set(ollamaKeepAlive.rawValue, forKey: Key.ollamaKeepAlive.rawValue)
+            defaults.set(mcpServerPort, forKey: Key.mcpServerPort.rawValue)
+            defaults.set(mcpServerEnabled, forKey: Key.mcpServerEnabled.rawValue)
 
             if let remoteOllamaURL {
                 defaults.set(remoteOllamaURL.absoluteString, forKey: Key.remoteOllamaURL.rawValue)
@@ -351,6 +369,13 @@ public final class AppConfiguration: @unchecked Sendable {
         if ollamaPort == 0 {
             ollamaPort = 11434
         }
+
+        // MCP server settings
+        mcpServerPort = defaults.integer(forKey: Key.mcpServerPort.rawValue)
+        if mcpServerPort == 0 {
+            mcpServerPort = 8765
+        }
+        mcpServerEnabled = defaults.bool(forKey: Key.mcpServerEnabled.rawValue)
 
         if let keepAliveStr = defaults.string(forKey: Key.ollamaKeepAlive.rawValue) {
             // rawValue is a string like "5m", "30s", "-1" — wrap in JSON string for decoder
@@ -480,6 +505,8 @@ public final class AppConfiguration: @unchecked Sendable {
         case generationRole
 
         case ollamaPort
+        case mcpServerPort
+        case mcpServerEnabled
         case ollamaKeepAlive
         case remoteOllamaURL
 

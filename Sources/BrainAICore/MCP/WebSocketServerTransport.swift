@@ -67,6 +67,9 @@ public final class WebSocketServerTransport: MCPTransport, @unchecked Sendable {
 @Observable
 public final class MCPWebSocketServer: @unchecked Sendable {
 
+    /// Shared app-wide instance backing the in-app server controls.
+    public static let shared = MCPWebSocketServer()
+
     public private(set) var isRunning = false
     public private(set) var port: UInt16
     public private(set) var activeConnections = 0
@@ -92,8 +95,10 @@ public final class MCPWebSocketServer: @unchecked Sendable {
     }
 
     /// Start listening. Re-starting a running server is a no-op.
-    public func start() throws {
+    /// - Parameter portOverride: optional port applied before binding.
+    public func start(port portOverride: UInt16? = nil) throws {
         guard !isRunning else { return }
+        if let portOverride { self.port = portOverride }
 
         let parameters = NWParameters.tcp
         let webSocketOptions = NWProtocolWebSocket.Options()

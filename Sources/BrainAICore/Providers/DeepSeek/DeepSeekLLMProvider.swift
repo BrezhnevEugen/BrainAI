@@ -71,6 +71,8 @@ public actor DeepSeekLLMProvider: LLMProvider {
     public let providerType: ProviderType
 
     private let httpClient: HTTPClient
+    private let baseURL: String
+    private let apiKey: String
 
     /// Models DeepSeek always offers, used as a fallback when `/models` is
     /// unreachable or returns an empty list.
@@ -110,6 +112,8 @@ public actor DeepSeekLLMProvider: LLMProvider {
         self.id = id
         self.displayName = displayName
         self.providerType = providerType
+        self.baseURL = baseURL
+        self.apiKey = apiKey
         self.httpClient = HTTPClient(baseURL: baseURL, authToken: apiKey)
     }
 
@@ -144,13 +148,13 @@ public actor DeepSeekLLMProvider: LLMProvider {
     }
 
     public func generateStream(prompt: String, model: String, options: GenerateOptions) async throws -> AsyncStream<String> {
-        // For now, implement streaming by wrapping the generate function.
-        // Proper SSE streaming can be implemented later.
-        let result = try await generate(prompt: prompt, model: model, options: options)
-        return AsyncStream { continuation in
-            continuation.yield(result)
-            continuation.finish()
-        }
+        try await OpenAICompatibleStreaming.chatStream(
+            baseURL: baseURL,
+            apiKey: apiKey,
+            model: model,
+            prompt: prompt,
+            options: options
+        )
     }
 
     public func availableModels() async throws -> [LLMModel] {

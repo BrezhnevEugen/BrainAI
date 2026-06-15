@@ -66,6 +66,8 @@ public actor OpenAILLMProvider: LLMProvider {
     public let providerType: ProviderType
 
     private let httpClient: HTTPClient
+    private let baseURL: String
+    private let apiKey: String
 
     /// Initialize an OpenAI LLM provider
     /// - Parameters:
@@ -84,6 +86,8 @@ public actor OpenAILLMProvider: LLMProvider {
         self.id = id
         self.displayName = displayName
         self.providerType = providerType
+        self.baseURL = baseURL
+        self.apiKey = apiKey
         self.httpClient = HTTPClient(baseURL: baseURL, authToken: apiKey)
     }
 
@@ -118,13 +122,13 @@ public actor OpenAILLMProvider: LLMProvider {
     }
 
     public func generateStream(prompt: String, model: String, options: GenerateOptions) async throws -> AsyncStream<String> {
-        // For now, implement streaming by wrapping the generate function
-        // Proper streaming can be implemented later
-        let result = try await generate(prompt: prompt, model: model, options: options)
-        return AsyncStream { continuation in
-            continuation.yield(result)
-            continuation.finish()
-        }
+        try await OpenAICompatibleStreaming.chatStream(
+            baseURL: baseURL,
+            apiKey: apiKey,
+            model: model,
+            prompt: prompt,
+            options: options
+        )
     }
 
     public func availableModels() async throws -> [LLMModel] {
