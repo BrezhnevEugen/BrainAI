@@ -106,7 +106,8 @@ public actor MCPServer {
             inputSchema: MCPInputSchema(
                 properties: [
                     "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)"),
-                    "status": MCPPropertySchema(type: "string", description: "Review status filter: needs_review, accepted, rejected, superseded, auto_accepted")
+                    "status": MCPPropertySchema(type: "string", description: "Review status filter: needs_review, accepted, rejected, superseded, auto_accepted"),
+                    "domain": MCPPropertySchema(type: "string", description: "Optional domain filter (work, personal-project, hobby-*, personal)")
                 ],
                 required: []
             )
@@ -281,6 +282,7 @@ public actor MCPServer {
     static let schemaResourceURI = "brainai://memory/schema"
     static let indexResourceURI = "brainai://memory/index"
     static let pageResourceURIPrefix = "brainai://memory/page/"
+    static let templateResourceURIPrefix = "brainai://memory/template/"
 
     private func handleResourcesList(_ request: MCPRequest) async -> MCPResponse {
         var resources = [
@@ -297,6 +299,18 @@ public actor MCPServer {
                 mimeType: "text/markdown"
             ),
         ]
+
+        // Authoring templates for each page kind that exposes one.
+        for kind in WikiPageKind.templatedKinds {
+            resources.append(
+                MCPResourceDescriptor(
+                    uri: Self.templateResourceURIPrefix + kind.rawValue,
+                    name: "\(kind.displayName) template",
+                    description: "Markdown body skeleton for a \(kind.rawValue) page.",
+                    mimeType: "text/markdown"
+                )
+            )
+        }
 
         // Each compiled wiki page is individually addressable as a resource.
         if let store = try? wikiStore(for: nil), let pages = try? await store.listPages() {
@@ -327,6 +341,12 @@ public actor MCPServer {
                 text = try await wikiStore(for: nil).readMemorySchema()
             case Self.indexResourceURI:
                 text = try await wikiStore(for: nil).readPage(at: "index.md").markdown
+            case let uri where uri.hasPrefix(Self.templateResourceURIPrefix):
+                let kindRaw = String(uri.dropFirst(Self.templateResourceURIPrefix.count))
+                guard let template = WikiPageKind(rawValue: kindRaw)?.bodyTemplate else {
+                    return MCPResponse(id: request.id, error: MCPError(code: -32602, message: "No template for: \(kindRaw)"))
+                }
+                text = template
             case let uri where uri.hasPrefix(Self.pageResourceURIPrefix):
                 let path = String(uri.dropFirst(Self.pageResourceURIPrefix.count))
                 text = try await wikiStore(for: nil).readPage(at: path).markdown
@@ -517,14 +537,29 @@ public actor MCPServer {
     private func executeWikiReviewQueue(_ args: [String: AnyCodable]) async throws -> String {
         let store = try wikiStore(for: stringArgument("workspace", from: args))
         let requestedStatus = stringArgument("status", from: args).flatMap(WikiReviewStatus.init(rawValue:))
+        let domainFilter = stringArgument("domain", from: args)?.trimmingCharacters(in: .whitespaces)
+
+        // Map page path -> domain once, so we can filter/annotate review items by domain.
+        var domainByPath: [String: String] = [:]
+        for page in try await store.listPages() {
+            if let domain = page.frontmatter["domain"], !domain.isEmpty {
+                domainByPath[page.path] = domain
+            }
+        }
+
         let items = try await store.listReviewItems()
             .filter { item in requestedStatus.map { status in item.status == status } ?? true }
+            .filter { item in
+                guard let domainFilter, !domainFilter.isEmpty else { return true }
+                return domainByPath[item.pagePath]?.caseInsensitiveCompare(domainFilter) == .orderedSame
+            }
             .map { item in
                 [
                     "id": AnyCodable.string(item.id.uuidString),
                     "title": AnyCodable.string(item.title),
                     "page_path": AnyCodable.string(item.pagePath),
                     "status": AnyCodable.string(item.status.rawValue),
+                    "domain": AnyCodable.string(domainByPath[item.pagePath] ?? ""),
                     "reason": AnyCodable.string(item.reason),
                     "created_at": AnyCodable.string(ISO8601DateFormatter().string(from: item.createdAt))
                 ]

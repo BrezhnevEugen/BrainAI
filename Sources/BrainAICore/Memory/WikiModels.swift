@@ -32,6 +32,68 @@ public enum WikiPageKind: String, Codable, CaseIterable, Sendable {
         case .unknown: "Unknown"
         }
     }
+
+    /// A Markdown body skeleton agents can fill when authoring this kind of page.
+    /// `nil` for kinds that have their own creation flow (source, synthesis, index, log).
+    public var bodyTemplate: String? {
+        switch self {
+        case .decision:
+            """
+            ## Decision
+
+            ## Context
+
+            ## Alternatives considered
+
+            ## Consequences
+            """
+        case .concept:
+            """
+            ## Summary
+
+            ## Details
+
+            ## Related
+            """
+        case .entity:
+            """
+            ## What it is
+
+            ## Key facts
+
+            ## Relations
+            """
+        case .question:
+            """
+            ## Question
+
+            ## What we know
+
+            ## Open points
+            """
+        case .contradiction:
+            """
+            ## Claim A
+
+            ## Claim B
+
+            ## Resolution
+            """
+        case .user:
+            """
+            ## Preference
+
+            ## Why it matters
+            """
+        case .source, .synthesis, .index, .log, .inbox, .unknown:
+            nil
+        }
+    }
+
+    /// Kinds that expose an authoring template.
+    public static var templatedKinds: [WikiPageKind] {
+        allCases.filter { $0.bodyTemplate != nil }
+    }
 }
 
 // MARK: - Wiki Frontmatter

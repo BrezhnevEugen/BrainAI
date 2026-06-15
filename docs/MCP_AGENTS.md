@@ -45,10 +45,11 @@ without a tool call:
 | `brainai://memory/schema` | Memory taxonomy (entity types, relation patterns, tagging conventions) |
 | `brainai://memory/index` | Index of compiled wiki pages in the active workspace |
 | `brainai://memory/page/<path>` | Any individual wiki page (also listed per-page in `resources/list`) |
+| `brainai://memory/template/<kind>` | Authoring skeleton for a page kind (`decision`, `concept`, `entity`, `question`, `contradiction`, `user`) |
 
-`brainai_wiki_search` accepts an optional `domain` to filter results. A workspace
-can carry a default `domain` (Settings → Workspaces) that `brainai_wiki_create_note`
-applies automatically when no `domain` is passed.
+`brainai_wiki_search` and `brainai_wiki_review_queue` accept an optional `domain`
+to filter results. A workspace can carry a default `domain` (Settings → Workspaces)
+that `brainai_wiki_create_note` applies automatically when no `domain` is passed.
 
 ## Connecting over stdio (Cursor, Claude Desktop, Claude Code)
 
