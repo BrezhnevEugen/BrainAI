@@ -36,10 +36,12 @@ public struct MCPResponse: Codable, Sendable {
 public struct MCPParams: Codable, Sendable {
     public let name: String?
     public let arguments: [String: AnyCodable]?
+    public let uri: String?
 
-    public init(name: String? = nil, arguments: [String: AnyCodable]? = nil) {
+    public init(name: String? = nil, arguments: [String: AnyCodable]? = nil, uri: String? = nil) {
         self.name = name
         self.arguments = arguments
+        self.uri = uri
     }
 }
 
@@ -47,10 +49,47 @@ public struct MCPParams: Codable, Sendable {
 public struct MCPResult: Codable, Sendable {
     public let content: [MCPContent]?
     public let tools: [MCPToolDefinition]?
+    public let resources: [MCPResourceDescriptor]?
+    public let contents: [MCPResourceContents]?
 
-    public init(content: [MCPContent]? = nil, tools: [MCPToolDefinition]? = nil) {
+    public init(
+        content: [MCPContent]? = nil,
+        tools: [MCPToolDefinition]? = nil,
+        resources: [MCPResourceDescriptor]? = nil,
+        contents: [MCPResourceContents]? = nil
+    ) {
         self.content = content
         self.tools = tools
+        self.resources = resources
+        self.contents = contents
+    }
+}
+
+/// MCP resource descriptor (returned by resources/list)
+public struct MCPResourceDescriptor: Codable, Sendable {
+    public let uri: String
+    public let name: String
+    public let description: String?
+    public let mimeType: String?
+
+    public init(uri: String, name: String, description: String? = nil, mimeType: String? = nil) {
+        self.uri = uri
+        self.name = name
+        self.description = description
+        self.mimeType = mimeType
+    }
+}
+
+/// MCP resource contents (returned by resources/read)
+public struct MCPResourceContents: Codable, Sendable {
+    public let uri: String
+    public let mimeType: String?
+    public let text: String?
+
+    public init(uri: String, mimeType: String? = nil, text: String? = nil) {
+        self.uri = uri
+        self.mimeType = mimeType
+        self.text = text
     }
 }
 

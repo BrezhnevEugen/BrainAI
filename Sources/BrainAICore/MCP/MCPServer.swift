@@ -129,6 +129,7 @@ public actor MCPServer {
                     "title": MCPPropertySchema(type: "string", description: "Page title"),
                     "body": MCPPropertySchema(type: "string", description: "Markdown body of the memory page (no H1 title or frontmatter)"),
                     "kind": MCPPropertySchema(type: "string", description: "Page kind: concept (default), decision, entity, question, contradiction, user, synthesis, inbox"),
+                    "domain": MCPPropertySchema(type: "string", description: "Optional life domain: work, personal-project, hobby-* (e.g. hobby-esp32), personal"),
                     "tags": MCPPropertySchema(type: "array", description: "Optional list of tag strings"),
                     "source_links": MCPPropertySchema(type: "array", description: "Optional list of wiki page paths to cite as sources"),
                     "confidence": MCPPropertySchema(type: "string", description: "Confidence label: low, medium (default), high"),
@@ -220,6 +221,12 @@ public actor MCPServer {
         case "tools/call":
             return await handleToolCall(request)
 
+        case "resources/list":
+            return await handleResourcesList(request)
+
+        case "resources/read":
+            return await handleResourcesRead(request)
+
         default:
             return MCPResponse(
                 id: request.id,
@@ -232,7 +239,7 @@ public actor MCPServer {
         MCPResponse(
             id: request.id,
             result: MCPResult(content: [
-                MCPContent(text: "{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"BrainAI\",\"version\":\"\(BrainAIMetadata.marketingVersion)\"}}")
+                MCPContent(text: "{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{\"tools\":{},\"resources\":{}},\"serverInfo\":{\"name\":\"BrainAI\",\"version\":\"\(BrainAIMetadata.marketingVersion)\"}}")
             ])
         )
     }
@@ -265,6 +272,55 @@ public actor MCPServer {
                 id: request.id,
                 error: MCPError(code: -32000, message: error.localizedDescription)
             )
+        }
+    }
+
+    // MARK: - Resources
+
+    static let schemaResourceURI = "brainai://memory/schema"
+    static let indexResourceURI = "brainai://memory/index"
+
+    private func handleResourcesList(_ request: MCPRequest) async -> MCPResponse {
+        let resources = [
+            MCPResourceDescriptor(
+                uri: Self.schemaResourceURI,
+                name: "Memory Schema",
+                description: "BrainAI memory taxonomy for the active workspace: page kinds, entity types, relation patterns, and domain/category tagging conventions.",
+                mimeType: "text/markdown"
+            ),
+            MCPResourceDescriptor(
+                uri: Self.indexResourceURI,
+                name: "Memory Index",
+                description: "Index of all compiled wiki memory pages in the active workspace.",
+                mimeType: "text/markdown"
+            ),
+        ]
+        return MCPResponse(id: request.id, result: MCPResult(resources: resources))
+    }
+
+    private func handleResourcesRead(_ request: MCPRequest) async -> MCPResponse {
+        guard let uri = request.params?.uri, !uri.isEmpty else {
+            return MCPResponse(id: request.id, error: MCPError(code: -32602, message: "Missing resource uri"))
+        }
+
+        do {
+            let text: String
+            switch uri {
+            case Self.schemaResourceURI:
+                text = try await wikiStore(for: nil).readMemorySchema()
+            case Self.indexResourceURI:
+                text = try await wikiStore(for: nil).readPage(at: "index.md").markdown
+            default:
+                return MCPResponse(id: request.id, error: MCPError(code: -32602, message: "Unknown resource: \(uri)"))
+            }
+            return MCPResponse(
+                id: request.id,
+                result: MCPResult(contents: [
+                    MCPResourceContents(uri: uri, mimeType: "text/markdown", text: text)
+                ])
+            )
+        } catch {
+            return MCPResponse(id: request.id, error: MCPError(code: -32000, message: error.localizedDescription))
         }
     }
 
@@ -479,6 +535,7 @@ public actor MCPServer {
         }
 
         let kind = stringArgument("kind", from: args).flatMap(WikiPageKind.init(rawValue:)) ?? .concept
+        let domain = stringArgument("domain", from: args)
         let confidence = stringArgument("confidence", from: args) ?? "medium"
         let tags = stringArrayArgument("tags", from: args)
         let sourceLinks = stringArrayArgument("source_links", from: args)
@@ -489,6 +546,7 @@ public actor MCPServer {
             kind: kind,
             title: title,
             body: body,
+            domain: domain,
             confidence: confidence,
             tags: tags,
             sourceLinks: sourceLinks,

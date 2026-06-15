@@ -31,7 +31,19 @@ workspace and accept an optional `workspace` slug/name to target another.
 
 Agent-authored wiki pages land in the **review queue** as `needs_review` (or
 `auto_accepted` when `auto_accept: true`), so a human stays in the loop before a
-note becomes trusted workspace memory.
+note becomes trusted workspace memory. `brainai_wiki_create_note` also accepts an
+optional `domain` (`work`, `personal-project`, `hobby-*`, `personal`) recorded in
+the page frontmatter.
+
+### Resources
+
+The server also exposes MCP **resources** so agents can read the memory model
+without a tool call:
+
+| URI | Contents |
+|-----|----------|
+| `brainai://memory/schema` | Memory taxonomy (entity types, relation patterns, tagging conventions) |
+| `brainai://memory/index` | Index of compiled wiki pages in the active workspace |
 
 ## Connecting over stdio (Cursor, Claude Desktop, Claude Code)
 
