@@ -162,6 +162,16 @@ public actor WikiPageStore {
         try appendLog("\(status.rawValue) review item for [[\(items[index].pagePath)]]")
     }
 
+    /// Read the workspace memory schema document (`schema/MEMORY_SCHEMA.md`).
+    public func readMemorySchema() throws -> String {
+        try ensureScaffold()
+        let url = schemaURL.appendingPathComponent("MEMORY_SCHEMA.md")
+        guard fileManager.fileExists(atPath: url.path) else {
+            return Self.defaultMemorySchemaMarkdown
+        }
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
     public func readPage(at path: String) throws -> WikiPage {
         try ensureScaffold()
         let pageURL = try urlForPage(path)
@@ -403,6 +413,7 @@ public actor WikiPageStore {
         kind: WikiPageKind,
         title: String,
         body: String,
+        domain: String? = nil,
         confidence: String = "medium",
         tags: [String] = [],
         sourceLinks: [String] = [],
@@ -430,6 +441,10 @@ public actor WikiPageStore {
         updated_at: \(now)
         confidence: \(confidence)
         """
+
+        if let domain = domain?.trimmingCharacters(in: .whitespacesAndNewlines), !domain.isEmpty {
+            frontmatter += "\ndomain: \(domain)"
+        }
 
         if !tags.isEmpty {
             let list = tags.map { "\"\(Self.escapeYAML($0))\"" }.joined(separator: ", ")

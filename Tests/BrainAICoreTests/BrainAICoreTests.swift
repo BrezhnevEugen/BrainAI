@@ -1434,16 +1434,67 @@ final class MCPWikiToolExecutionTests: XCTestCase {
         XCTAssertEqual(activeSlugs, ["first"])
     }
 
+    func testWikiCreateNoteToolStoresDomain() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Domain WS", slug: "domainws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_create_note",
+            arguments: [
+                "title": .string("Auth service uses JWT"),
+                "body": .string("The work auth service issues JWTs."),
+                "kind": .string("decision"),
+                "domain": .string("work"),
+                "workspace": .string("domainws")
+            ]
+        )
+        let path = try XCTUnwrap(stringValue(try toolPayload(from: response)["path"]))
+
+        let page = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: ["path_or_slug": .string(path), "workspace": .string("domainws")]
+        )
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: page)["markdown"]))
+        XCTAssertTrue(markdown.contains("domain: work"), "frontmatter should record the domain")
+    }
+
+    func testResourcesListAndRead() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Res WS", slug: "resws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let list = try await send(server, MCPRequest(id: 1, method: "resources/list"))
+        let resources = try XCTUnwrap(list.result?.resources)
+        XCTAssertEqual(resources.count, 2)
+        XCTAssertTrue(resources.contains { $0.uri == MCPServer.schemaResourceURI })
+
+        let read = try await send(
+            server,
+            MCPRequest(id: 2, method: "resources/read", params: MCPParams(uri: MCPServer.schemaResourceURI))
+        )
+        let contents = try XCTUnwrap(read.result?.contents)
+        XCTAssertEqual(contents.first?.uri, MCPServer.schemaResourceURI)
+        XCTAssertTrue(contents.first?.text?.contains("BrainAI Memory Schema") ?? false)
+
+        let unknown = try await send(
+            server,
+            MCPRequest(id: 3, method: "resources/read", params: MCPParams(uri: "brainai://memory/nope"))
+        )
+        XCTAssertNotNil(unknown.error)
+    }
+
     private func callTool(
         _ server: MCPServer,
         name: String,
         arguments: [String: AnyCodable]
     ) async throws -> MCPResponse {
-        let request = MCPRequest(
-            id: 1,
-            method: "tools/call",
-            params: MCPParams(name: name, arguments: arguments)
-        )
+        try await send(server, MCPRequest(id: 1, method: "tools/call", params: MCPParams(name: name, arguments: arguments)))
+    }
+
+    private func send(_ server: MCPServer, _ request: MCPRequest) async throws -> MCPResponse {
         let requestData = try JSONEncoder().encode(request)
         let transport = TestMCPTransport(requests: [requestData])
         let serverTask = Task {
