@@ -83,6 +83,7 @@ public actor MCPServer {
             inputSchema: MCPInputSchema(
                 properties: [
                     "query": MCPPropertySchema(type: "string", description: "Text to search for in wiki title, path, and markdown"),
+                    "domain": MCPPropertySchema(type: "string", description: "Optional domain filter (work, personal-project, hobby-*, personal)"),
                     "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
                 ],
                 required: ["query"]
@@ -279,9 +280,10 @@ public actor MCPServer {
 
     static let schemaResourceURI = "brainai://memory/schema"
     static let indexResourceURI = "brainai://memory/index"
+    static let pageResourceURIPrefix = "brainai://memory/page/"
 
     private func handleResourcesList(_ request: MCPRequest) async -> MCPResponse {
-        let resources = [
+        var resources = [
             MCPResourceDescriptor(
                 uri: Self.schemaResourceURI,
                 name: "Memory Schema",
@@ -295,6 +297,21 @@ public actor MCPServer {
                 mimeType: "text/markdown"
             ),
         ]
+
+        // Each compiled wiki page is individually addressable as a resource.
+        if let store = try? wikiStore(for: nil), let pages = try? await store.listPages() {
+            for page in pages where page.path != "index.md" {
+                resources.append(
+                    MCPResourceDescriptor(
+                        uri: Self.pageResourceURIPrefix + page.path,
+                        name: page.title,
+                        description: "\(page.kind.displayName) page" + (page.frontmatter["domain"].map { " · \($0)" } ?? ""),
+                        mimeType: "text/markdown"
+                    )
+                )
+            }
+        }
+
         return MCPResponse(id: request.id, result: MCPResult(resources: resources))
     }
 
@@ -310,6 +327,9 @@ public actor MCPServer {
                 text = try await wikiStore(for: nil).readMemorySchema()
             case Self.indexResourceURI:
                 text = try await wikiStore(for: nil).readPage(at: "index.md").markdown
+            case let uri where uri.hasPrefix(Self.pageResourceURIPrefix):
+                let path = String(uri.dropFirst(Self.pageResourceURIPrefix.count))
+                text = try await wikiStore(for: nil).readPage(at: path).markdown
             default:
                 return MCPResponse(id: request.id, error: MCPError(code: -32602, message: "Unknown resource: \(uri)"))
             }
@@ -435,13 +455,18 @@ public actor MCPServer {
             throw MCPToolError.missingArgument("query")
         }
 
+        let domainFilter = stringArgument("domain", from: args)?.trimmingCharacters(in: .whitespaces)
         let store = try wikiStore(for: stringArgument("workspace", from: args))
         let pages = try await store.listPages()
         let matches = pages
-            .filter {
-                $0.title.localizedCaseInsensitiveContains(query) ||
-                    $0.path.localizedCaseInsensitiveContains(query) ||
-                    $0.markdown.localizedCaseInsensitiveContains(query)
+            .filter { page in
+                if let domainFilter, !domainFilter.isEmpty,
+                   page.frontmatter["domain"]?.caseInsensitiveCompare(domainFilter) != .orderedSame {
+                    return false
+                }
+                return page.title.localizedCaseInsensitiveContains(query) ||
+                    page.path.localizedCaseInsensitiveContains(query) ||
+                    page.markdown.localizedCaseInsensitiveContains(query)
             }
             .prefix(20)
             .map { page in
@@ -449,6 +474,7 @@ public actor MCPServer {
                     "title": AnyCodable.string(page.title),
                     "path": AnyCodable.string(page.path),
                     "kind": AnyCodable.string(page.kind.rawValue),
+                    "domain": AnyCodable.string(page.frontmatter["domain"] ?? ""),
                     "updated_at": AnyCodable.string(ISO8601DateFormatter().string(from: page.updatedAt))
                 ]
             }
@@ -535,13 +561,15 @@ public actor MCPServer {
         }
 
         let kind = stringArgument("kind", from: args).flatMap(WikiPageKind.init(rawValue:)) ?? .concept
-        let domain = stringArgument("domain", from: args)
+        let workspaceSelector = stringArgument("workspace", from: args)
+        // Fall back to the workspace's default domain when none is provided.
+        let domain = stringArgument("domain", from: args) ?? resolveWorkspace(for: workspaceSelector)?.domain
         let confidence = stringArgument("confidence", from: args) ?? "medium"
         let tags = stringArrayArgument("tags", from: args)
         let sourceLinks = stringArrayArgument("source_links", from: args)
         let autoAccept = boolArgument("auto_accept", from: args) ?? false
 
-        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let store = try wikiStore(for: workspaceSelector)
         let page = try await store.createMemoryPage(
             kind: kind,
             title: title,
@@ -603,6 +631,15 @@ public actor MCPServer {
             "results": .array(rows.map { .object($0) })
         ]
         return try encodeToolPayload(payload)
+    }
+
+    private func resolveWorkspace(for selector: String?) -> Workspace? {
+        if let selector, !selector.isEmpty {
+            return workspaceManager.workspaces.first {
+                $0.slug == selector || $0.name.localizedCaseInsensitiveCompare(selector) == .orderedSame
+            }
+        }
+        return workspaceManager.activeWorkspace
     }
 
     private func wikiStore(for workspaceSelector: String?) throws -> WikiPageStore {

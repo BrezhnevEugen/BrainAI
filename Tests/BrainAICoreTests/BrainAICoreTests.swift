@@ -1468,8 +1468,9 @@ final class MCPWikiToolExecutionTests: XCTestCase {
 
         let list = try await send(server, MCPRequest(id: 1, method: "resources/list"))
         let resources = try XCTUnwrap(list.result?.resources)
-        XCTAssertEqual(resources.count, 2)
+        XCTAssertGreaterThanOrEqual(resources.count, 2)
         XCTAssertTrue(resources.contains { $0.uri == MCPServer.schemaResourceURI })
+        XCTAssertTrue(resources.contains { $0.uri == MCPServer.indexResourceURI })
 
         let read = try await send(
             server,
@@ -1484,6 +1485,71 @@ final class MCPWikiToolExecutionTests: XCTestCase {
             MCPRequest(id: 3, method: "resources/read", params: MCPParams(uri: "brainai://memory/nope"))
         )
         XCTAssertNotNil(unknown.error)
+    }
+
+    func testWikiSearchFiltersByDomain() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Filter WS", slug: "filterws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        // Use a body-only keyword so the workspace log (which records titles) doesn't match.
+        _ = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Alpha note"), "body": .string("zzkeyword apple"),
+            "domain": .string("work"), "workspace": .string("filterws")
+        ])
+        _ = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Beta note"), "body": .string("zzkeyword banana"),
+            "domain": .string("hobby-esp32"), "workspace": .string("filterws")
+        ])
+
+        let all = try await callTool(server, name: "brainai_wiki_search", arguments: [
+            "query": .string("zzkeyword"), "workspace": .string("filterws")
+        ])
+        XCTAssertEqual(intValue(try toolPayload(from: all)["count"]), 2)
+
+        let workOnly = try await callTool(server, name: "brainai_wiki_search", arguments: [
+            "query": .string("zzkeyword"), "domain": .string("work"), "workspace": .string("filterws")
+        ])
+        XCTAssertEqual(intValue(try toolPayload(from: workOnly)["count"]), 1)
+    }
+
+    func testWikiCreateNoteInheritsWorkspaceDomain() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let ws = try await manager.create(name: "Domain Default WS", slug: "ddws")
+        try await manager.setDomain(id: ws.id, domain: "personal-project")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Note without domain"), "body": .string("body"),
+            "workspace": .string("ddws")
+        ])
+        let path = try XCTUnwrap(stringValue(try toolPayload(from: response)["path"]))
+        let page = try await callTool(server, name: "brainai_wiki_get_page", arguments: [
+            "path_or_slug": .string(path), "workspace": .string("ddws")
+        ])
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: page)["markdown"]))
+        XCTAssertTrue(markdown.contains("domain: personal-project"))
+    }
+
+    func testResourcesIncludePagesAndReadByURI() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Page Res WS", slug: "pageresws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let created = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Findable page"), "body": .string("unique-content-xyz"),
+            "workspace": .string("pageresws")
+        ])
+        let path = try XCTUnwrap(stringValue(try toolPayload(from: created)["path"]))
+
+        let list = try await send(server, MCPRequest(id: 1, method: "resources/list"))
+        let resources = try XCTUnwrap(list.result?.resources)
+        let pageURI = MCPServer.pageResourceURIPrefix + path
+        XCTAssertTrue(resources.contains { $0.uri == pageURI }, "page should be listed as a resource")
+
+        let read = try await send(server, MCPRequest(id: 2, method: "resources/read", params: MCPParams(uri: pageURI)))
+        let contents = try XCTUnwrap(read.result?.contents)
+        XCTAssertTrue(contents.first?.text?.contains("unique-content-xyz") ?? false)
     }
 
     private func callTool(

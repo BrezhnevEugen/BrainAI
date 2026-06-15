@@ -22,6 +22,9 @@ public struct Workspace: Identifiable, Codable, Sendable {
     /// Optional description
     public var description: String?
 
+    /// Optional default memory domain (work, personal-project, hobby-*, personal)
+    public var domain: String?
+
     /// Port the workspace's LightRAG service runs on
     public var port: UInt16
 
@@ -72,6 +75,7 @@ public struct Workspace: Identifiable, Codable, Sendable {
         icon: String = "circle.fill",
         color: String = "#6B7280",
         description: String? = nil,
+        domain: String? = nil,
         port: UInt16,
         dataPath: URL,
         embeddingRole: RoleConfig? = nil,
@@ -93,6 +97,7 @@ public struct Workspace: Identifiable, Codable, Sendable {
         self.icon = icon
         self.color = color
         self.description = description
+        self.domain = domain
         self.port = port
         self.dataPath = dataPath
         self.embeddingRole = embeddingRole
@@ -116,6 +121,7 @@ public struct Workspace: Identifiable, Codable, Sendable {
         case icon
         case color
         case description
+        case domain
         case port
         case dataPath = "data_path"
         case embeddingRole = "embedding_role"

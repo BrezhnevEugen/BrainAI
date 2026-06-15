@@ -123,6 +123,8 @@ struct WorkspaceDetailView: View {
     let workspace: Workspace
     let manager: WorkspaceManager
 
+    @State private var domainText: String = ""
+
     var body: some View {
         Form {
             // Info
@@ -147,6 +149,22 @@ struct WorkspaceDetailView: View {
                 }
             } header: {
                 Text("Information")
+            }
+
+            // Memory Domain
+            Section {
+                HStack {
+                    TextField("e.g. work, hobby-esp32", text: $domainText)
+                    Button("Save") {
+                        let value = domainText
+                        Task { try? await manager.setDomain(id: workspace.id, domain: value) }
+                    }
+                    .disabled(domainText.trimmingCharacters(in: .whitespaces) == (workspace.domain ?? ""))
+                }
+            } header: {
+                Text("Memory Domain")
+            } footer: {
+                Text("Default domain tagged on new memory pages created in this workspace (work, personal-project, hobby-*, personal).")
             }
 
             // Start Policy
@@ -252,6 +270,8 @@ struct WorkspaceDetailView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { domainText = workspace.domain ?? "" }
+        .onChange(of: workspace.id) { _, _ in domainText = workspace.domain ?? "" }
     }
 }
 
