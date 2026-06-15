@@ -206,9 +206,13 @@ struct ActivityItem: Identifiable, Sendable {
 // MARK: - Dashboard View (reference layout: overview chrome + bento + workspace / activity + footer)
 
 struct DashboardView: View {
-    @State private var viewModel = DashboardViewModel()
+    @State private var viewModel: DashboardViewModel
     @Bindable private var config = AppConfiguration.shared
     @State private var headerSearchQuery = ""
+
+    init(workspaceManager: WorkspaceManager = WorkspaceManager.shared) {
+        _viewModel = State(initialValue: DashboardViewModel(workspaceManager: workspaceManager))
+    }
 
     var body: some View {
         ZStack {

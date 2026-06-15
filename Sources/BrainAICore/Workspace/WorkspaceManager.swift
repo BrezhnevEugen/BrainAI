@@ -26,6 +26,8 @@ public struct WorkspaceQueryResult: Sendable {
 /// Manages workspace lifecycle and queries
 @Observable
 public final class WorkspaceManager: @unchecked Sendable {
+    public static let shared = WorkspaceManager()
+
     public private(set) var workspaces: [Workspace]
     public var activeWorkspace: Workspace?
 
@@ -92,6 +94,10 @@ public final class WorkspaceManager: @unchecked Sendable {
             )
 
             workspaces.append(ws)
+            if activeWorkspace == nil {
+                activeWorkspace = ws
+                AppConfiguration.shared.defaultWorkspaceID = ws.id.uuidString
+            }
             return ws
         }
 
@@ -112,11 +118,24 @@ public final class WorkspaceManager: @unchecked Sendable {
             workspaces.remove(at: index)
 
             if activeWorkspace?.id == id {
-                activeWorkspace = nil
+                activeWorkspace = workspaces.first
+                AppConfiguration.shared.defaultWorkspaceID = activeWorkspace?.id.uuidString ?? ""
             }
         }
 
         try await saveWorkspaces()
+    }
+
+    /// Mark a workspace as active and persist it as the default workspace for app launch.
+    public func setActive(id: UUID) async throws {
+        try withLock {
+            guard let workspace = workspaces.first(where: { $0.id == id }) else {
+                throw BrainAIError.workspaceError("Workspace not found: \(id)")
+            }
+
+            activeWorkspace = workspace
+            AppConfiguration.shared.defaultWorkspaceID = workspace.id.uuidString
+        }
     }
 
     /// Start a workspace's services
@@ -183,7 +202,10 @@ public final class WorkspaceManager: @unchecked Sendable {
             decoder.dateDecodingStrategy = .iso8601
             let loaded = try decoder.decode([Workspace].self, from: data)
 
-            withLock { workspaces = loaded }
+            withLock {
+                workspaces = loaded
+                activeWorkspace = Self.resolveActiveWorkspace(from: loaded)
+            }
         } catch {
             withLock { workspaces = [] }
         }
@@ -202,5 +224,14 @@ public final class WorkspaceManager: @unchecked Sendable {
 
         let data = try encoder.encode(workspacesCopy)
         try data.write(to: configPath)
+    }
+
+    private static func resolveActiveWorkspace(from workspaces: [Workspace]) -> Workspace? {
+        let defaultID = AppConfiguration.shared.defaultWorkspaceID
+        if let uuid = UUID(uuidString: defaultID),
+           let workspace = workspaces.first(where: { $0.id == uuid }) {
+            return workspace
+        }
+        return workspaces.first
     }
 }

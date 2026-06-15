@@ -8,8 +8,10 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     let content: String
     let timestamp: Date
+    var prompt: String?
     var ragContext: String?
     var isStreaming: Bool = false
+    var savedWikiPath: String?
 }
 
 // MARK: - Chat ViewModel
@@ -24,20 +26,24 @@ final class ChatViewModel: @unchecked Sendable {
     var selectedMode: SearchMode = .hybrid
     var selectedModel: String = ""
     var ragContext: String?
+    var memoryStatusMessage: String?
 
     // MARK: - Dependencies
 
     private let lightRAGClient: LocalLightRAGClient
     private let config: AppConfiguration
+    private let workspaceManager: WorkspaceManager
 
     // MARK: - Initialization
 
     init(
         lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(),
-        config: AppConfiguration = AppConfiguration.shared
+        config: AppConfiguration = AppConfiguration.shared,
+        workspaceManager: WorkspaceManager = WorkspaceManager.shared
     ) {
         self.lightRAGClient = lightRAGClient
         self.config = config
+        self.workspaceManager = workspaceManager
         self.selectedModel = config.generationRole.modelID
     }
 
@@ -100,6 +106,7 @@ final class ChatViewModel: @unchecked Sendable {
                 role: .assistant,
                 content: response,
                 timestamp: Date(),
+                prompt: userMessage,
                 ragContext: contextText
             )
 
@@ -154,6 +161,54 @@ final class ChatViewModel: @unchecked Sendable {
         messages.removeAll()
         inputText = ""
         ragContext = nil
+        memoryStatusMessage = nil
+    }
+
+    func saveToWiki(_ message: ChatMessage) {
+        guard message.role == .assistant, message.savedWikiPath == nil else { return }
+
+        Task {
+            do {
+                let store = await currentWikiStore()
+                let title = synthesisTitle(for: message)
+                let page = try await store.createSynthesisPage(
+                    title: title,
+                    question: message.prompt ?? "Saved chat answer",
+                    answer: message.content,
+                    ragContext: message.ragContext,
+                    model: selectedModel,
+                    searchMode: selectedMode
+                )
+                try await store.regenerateIndex()
+
+                await MainActor.run {
+                    if let index = self.messages.firstIndex(where: { $0.id == message.id }) {
+                        self.messages[index].savedWikiPath = page.path
+                    }
+                    self.memoryStatusMessage = "Saved to Wiki review queue: \(page.path)"
+                }
+            } catch {
+                await MainActor.run {
+                    self.memoryStatusMessage = "Failed to save Wiki synthesis: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func currentWikiStore() async -> WikiPageStore {
+        let workspace = await MainActor.run { workspaceManager.activeWorkspace }
+        if let workspace {
+            return WikiPageStore(workspaceURL: workspace.dataPath)
+        }
+        return WikiPageStore(workspaceSlug: "default")
+    }
+
+    private func synthesisTitle(for message: ChatMessage) -> String {
+        let prompt = message.prompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let base = prompt.isEmpty ? message.content : prompt
+        let firstLine = base.components(separatedBy: .newlines).first ?? "Chat Synthesis"
+        let trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String((trimmed.isEmpty ? "Chat Synthesis" : trimmed).prefix(80))
     }
 }
 
@@ -172,6 +227,10 @@ struct ChatView: View {
 
             // Messages area
             messagesArea
+
+            if let status = viewModel.memoryStatusMessage {
+                memoryStatus(status)
+            }
 
             Divider()
                 .background(SynapseColor.outlineVariant.opacity(0.25))
@@ -310,6 +369,30 @@ struct ChatView: View {
                         }
                         .font(.caption)
                     }
+
+                    if message.role == .assistant {
+                        HStack(spacing: 8) {
+                            Button {
+                                viewModel.saveToWiki(message)
+                            } label: {
+                                Label(
+                                    message.savedWikiPath == nil ? "Save to Wiki" : "Saved",
+                                    systemImage: message.savedWikiPath == nil ? "book.pages" : "checkmark.circle"
+                                )
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(message.savedWikiPath != nil)
+                            .help("Save answer to Wiki review queue")
+
+                            if let savedWikiPath = message.savedWikiPath {
+                                Text(savedWikiPath)
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(SynapseColor.onSurfaceVariant)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .font(.caption)
+                    }
                 }
                 .padding(12)
                 .background(
@@ -337,6 +420,23 @@ struct ChatView: View {
                 .foregroundStyle(SynapseColor.onSurfaceVariant)
                 .padding(.horizontal, 4)
         }
+    }
+
+    private func memoryStatus(_ status: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: status.hasPrefix("Failed") ? "exclamationmark.triangle" : "checkmark.circle")
+                .foregroundStyle(status.hasPrefix("Failed") ? .orange : SynapseColor.primary)
+
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(SynapseColor.onSurfaceVariant)
+                .lineLimit(1)
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(SynapseColor.surfaceContainerLow)
     }
 
     // MARK: - Typing Indicator

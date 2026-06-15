@@ -4,7 +4,7 @@ import BrainAICore
 // MARK: - WorkspacesTab
 
 struct WorkspacesTab: View {
-    @State private var workspaceManager = WorkspaceManager()
+    @State private var workspaceManager = WorkspaceManager.shared
     @State private var selectedWorkspaceID: UUID?
     @State private var showCreateSheet = false
     @State private var showDeleteConfirmation = false
@@ -17,7 +17,13 @@ struct WorkspacesTab: View {
                 List(workspaceManager.workspaces, selection: $selectedWorkspaceID) { workspace in
                     WorkspaceListRow(workspace: workspace)
                         .tag(workspace.id)
+                        .onTapGesture {
+                            Task { try? await workspaceManager.setActive(id: workspace.id) }
+                        }
                         .contextMenu {
+                            Button("Make Active") {
+                                Task { try? await workspaceManager.setActive(id: workspace.id) }
+                            }
                             Button("Delete", role: .destructive) {
                                 workspaceToDelete = workspace
                                 showDeleteConfirmation = true
@@ -25,6 +31,10 @@ struct WorkspacesTab: View {
                         }
                 }
                 .listStyle(.sidebar)
+                .onChange(of: selectedWorkspaceID) { _, id in
+                    guard let id else { return }
+                    Task { try? await workspaceManager.setActive(id: id) }
+                }
 
                 Divider()
 
@@ -57,6 +67,9 @@ struct WorkspacesTab: View {
         .scrollContentBackground(.hidden)
         .background(SynapseColor.surface)
         .navigationTitle(L10n.Settings.workspaces)
+        .task {
+            selectedWorkspaceID = workspaceManager.activeWorkspace?.id ?? workspaceManager.workspaces.first?.id
+        }
         .sheet(isPresented: $showCreateSheet) {
             CreateWorkspaceSheet(manager: workspaceManager, isPresented: $showCreateSheet)
         }

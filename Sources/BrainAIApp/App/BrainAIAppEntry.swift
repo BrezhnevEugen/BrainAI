@@ -94,6 +94,9 @@ final class BrainAIApplicationDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.setupMainMenu()
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            BrainAICompanionAppLauncher.openTrayIfNeeded()
+        }
 
         if shouldOpenSettingsAfterLaunch {
             shouldOpenSettingsAfterLaunch = false

@@ -107,6 +107,7 @@ public final class L10n: Sendable {
         public static var documents: String { tr("nav.documents") }
         public static var search: String { tr("nav.search") }
         public static var notes: String { tr("nav.notes") }
+        public static var wiki: String { "Wiki" }
         public static var graph: String { tr("nav.graph") }
         public static var settings: String { tr("nav.settings") }
         /// Короткая подпись для сайдбара и панелей (меню приложения — `AppMenu.setupWizard`).

@@ -19,6 +19,7 @@ struct TrayApp {
 final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
+    private var statusMenu = NSMenu()
     private let systemMonitor = SystemMonitor()
     private let serviceOrchestrator: ServiceOrchestrator
     private let remoteConnectionManager = RemoteConnectionManager()
@@ -56,11 +57,73 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "brain", accessibilityDescription: "BrainAI")
-            button.image?.size = NSSize(width: 18, height: 18)
+            button.image = Self.makeStatusBarIcon()
+            button.title = "BrainAI"
+            button.imagePosition = .imageLeading
+            button.toolTip = "BrainAI"
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
         }
 
         rebuildMenu()
+    }
+
+    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        rebuildMenu()
+        statusItem?.popUpMenu(statusMenu)
+    }
+
+    private static func makeStatusBarIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+
+        NSColor.black.setStroke()
+        NSColor.black.setFill()
+
+        let line = NSBezierPath()
+        line.lineWidth = 1.8
+        line.lineCapStyle = .round
+        line.lineJoinStyle = .round
+        line.move(to: NSPoint(x: 4.0, y: 6.3))
+        line.curve(
+            to: NSPoint(x: 9.0, y: 12.4),
+            controlPoint1: NSPoint(x: 4.8, y: 10.6),
+            controlPoint2: NSPoint(x: 6.8, y: 12.6)
+        )
+        line.curve(
+            to: NSPoint(x: 14.0, y: 6.8),
+            controlPoint1: NSPoint(x: 11.6, y: 12.2),
+            controlPoint2: NSPoint(x: 13.3, y: 10.8)
+        )
+        line.stroke()
+
+        let secondLine = NSBezierPath()
+        secondLine.lineWidth = 1.8
+        secondLine.lineCapStyle = .round
+        secondLine.move(to: NSPoint(x: 6.0, y: 5.4))
+        secondLine.curve(
+            to: NSPoint(x: 12.2, y: 5.5),
+            controlPoint1: NSPoint(x: 7.4, y: 3.2),
+            controlPoint2: NSPoint(x: 10.6, y: 3.2)
+        )
+        secondLine.stroke()
+
+        for node in [
+            NSRect(x: 2.7, y: 4.8, width: 3.2, height: 3.2),
+            NSRect(x: 7.4, y: 11.0, width: 3.2, height: 3.2),
+            NSRect(x: 12.1, y: 5.4, width: 3.2, height: 3.2),
+            NSRect(x: 8.0, y: 3.1, width: 2.6, height: 2.6),
+        ] {
+            NSBezierPath(ovalIn: node).fill()
+        }
+
+        image.unlockFocus()
+        image.isTemplate = true
+        image.size = size
+        image.accessibilityDescription = "BrainAI"
+        return image
     }
 
     /// Disabled `NSMenuItem` rows are dimmed by the system on vibrant menus — use enabled + no-op for read-only rows.
@@ -80,6 +143,7 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildMenu() {
         let menu = NSMenu()
+        menu.autoenablesItems = false
 
         // Status header
         let titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -158,7 +222,7 @@ final class TrayAppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        statusItem?.menu = menu
+        statusMenu = menu
     }
 
     // MARK: - Menu Items

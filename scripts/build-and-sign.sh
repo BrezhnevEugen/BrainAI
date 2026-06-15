@@ -23,7 +23,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:-${VERSION:-0.1.6}}"
+VERSION="${1:-${VERSION:-0.1.7}}"
 CONFIG="${CONFIG:-release}"
 DIST="${DIST:-$ROOT/dist}"
 STAGE="$DIST/stage/BrainAI-$VERSION"
@@ -36,11 +36,9 @@ export DMG_SINGLE_APP
 
 echo "==> DMG layout: DMG_SINGLE_APP=$DMG_SINGLE_APP (1 = один BrainAI.app + BrainAIEmbedded, 0 = четыре .app рядом)"
 echo "==> Swift build ($CONFIG, all app products)"
-swift build -c "$CONFIG" \
-  --product BrainAITray \
-  --product BrainAISettings \
-  --product BrainAIApp \
-  --product BrainAIInstaller
+for product in BrainAITray BrainAISettings BrainAIApp BrainAIInstaller; do
+  swift build -c "$CONFIG" --product "$product"
+done
 
 BIN_DIR="$(swift build -c "$CONFIG" --product BrainAIApp --show-bin-path)"
 echo "==> Binaries: $BIN_DIR"
@@ -155,8 +153,10 @@ assemble_app() {
   local icon_src="$ROOT/Resources/AppIcon.icns"
   if [[ -f "$icon_src" ]]; then
     mkdir -p "$app_path/Contents/Resources"
-    cp "$icon_src" "$app_path/Contents/Resources/AppIcon.icns"
-    plist_set_string "$info" CFBundleIconFile "AppIcon"
+    cp -X "$icon_src" "$app_path/Contents/Resources/AppIcon.icns" 2>/dev/null || cp "$icon_src" "$app_path/Contents/Resources/AppIcon.icns"
+    xattr -c "$app_path/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+    plist_set_string "$info" CFBundleIconFile "AppIcon.icns"
+    plist_set_string "$info" CFBundleIconName "AppIcon"
   fi
 
   # So macOS treats the app as multilingual (helps locale resolution for bundled resources).
@@ -205,13 +205,17 @@ strip_bundle_xattrs() {
 
 sign_if_needed() {
   local target="$1"
-  if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
-    return 0
+  if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    echo "==> codesign: $target"
+    codesign --force --timestamp --options runtime \
+      --sign "$CODESIGN_IDENTITY" \
+      "$target"
+  elif [[ "${ADHOC_SIGN:-1}" == "1" ]]; then
+    echo "==> ad-hoc codesign: $target"
+    # Local ad-hoc builds must not enable hardened runtime: library validation
+    # rejects bundled Sparkle at launch because there is no stable Developer ID team.
+    codesign --force --sign - "$target"
   fi
-  echo "==> codesign: $target"
-  codesign --force --timestamp --options runtime \
-    --sign "$CODESIGN_IDENTITY" \
-    "$target"
 }
 
 # Sparkle.framework ships nested helpers (Autoupdate, Updater.app, XPCServices).
@@ -219,7 +223,7 @@ sign_if_needed() {
 # signing only the outer .framework is not enough.
 sign_sparkle_framework() {
   local fw="$1"
-  if [[ -z "${CODESIGN_IDENTITY:-}" ]] || [[ ! -d "$fw" ]]; then
+  if [[ -z "${CODESIGN_IDENTITY:-}" && "${ADHOC_SIGN:-1}" != "1" ]] || [[ ! -d "$fw" ]]; then
     return 0
   fi
   local tmp
@@ -239,12 +243,18 @@ sign_sparkle_framework() {
   while IFS= read -r -d '' app_bundle; do
     sign_if_needed "$app_bundle"
   done < <(find "$fw" -name "*.app" -type d -print0 2>/dev/null)
+  # Re-sign nested XPC bundles too; otherwise hardened runtime library validation can
+  # reject Sparkle pieces that still carry Sparkle's original Team ID.
+  local xpc_bundle
+  while IFS= read -r -d '' xpc_bundle; do
+    sign_if_needed "$xpc_bundle"
+  done < <(find "$fw" -name "*.xpc" -type d -print0 2>/dev/null)
   sign_if_needed "$fw"
 }
 
 sign_app() {
   local app="$1"
-  if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+  if [[ -z "${CODESIGN_IDENTITY:-}" && "${ADHOC_SIGN:-1}" != "1" ]]; then
     return 0
   fi
   strip_bundle_xattrs "$app"
@@ -264,7 +274,7 @@ sign_app() {
   sign_if_needed "$app"
 }
 
-if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+if [[ -n "${CODESIGN_IDENTITY:-}" || "${ADHOC_SIGN:-1}" == "1" ]]; then
   if [[ "${DMG_SINGLE_APP:-0}" == "1" ]]; then
     EMBED="$STAGE_APPS/BrainAI.app/Contents/Resources/BrainAIEmbedded"
     if [[ -d "$EMBED" ]]; then
