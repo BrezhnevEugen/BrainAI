@@ -27,18 +27,27 @@ final class DocumentsViewModel: @unchecked Sendable {
     // MARK: - Dependencies
 
     private let lightRAGClient: LocalLightRAGClient
+    private let workspaceManager: WorkspaceManager
     private let pageSize: Int = 20
 
     // MARK: - Initialization
 
-    init(lightRAGClient: LocalLightRAGClient = LocalLightRAGClient()) {
+    init(
+        lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(),
+        workspaceManager: WorkspaceManager = WorkspaceManager.shared
+    ) {
         self.lightRAGClient = lightRAGClient
+        self.workspaceManager = workspaceManager
     }
 
     // MARK: - Public Methods
 
     /// Load documents for current page
     func loadDocuments() async {
+        await loadDocuments(append: false)
+    }
+
+    private func loadDocuments(append: Bool) async {
         isLoading = true
         errorMessage = nil
 
@@ -50,7 +59,7 @@ final class DocumentsViewModel: @unchecked Sendable {
             )
 
             await MainActor.run {
-                self.documents = response.documents
+                self.documents = append ? self.documents + response.documents : response.documents
                 self.totalDocuments = response.total
                 self.hasMore = response.hasMore
                 self.isLoading = false
@@ -65,8 +74,9 @@ final class DocumentsViewModel: @unchecked Sendable {
 
     /// Load next page of documents
     func loadMore() async {
+        guard hasMore, !isLoading else { return }
         currentPage += 1
-        await loadDocuments()
+        await loadDocuments(append: true)
     }
 
     /// Refresh documents (reset to page 1 and reload)
@@ -88,7 +98,23 @@ final class DocumentsViewModel: @unchecked Sendable {
             let filename = url.lastPathComponent
 
             // Insert text into knowledge base
-            _ = try await lightRAGClient.insertText(content, description: filename)
+            let response = try await lightRAGClient.insertText(content, description: filename)
+
+            do {
+                let wikiStore = await currentWikiStore()
+                try await wikiStore.createSourcePage(
+                    title: filename,
+                    content: content,
+                    sourceType: "document",
+                    trackId: response.trackId,
+                    originalPath: url.path
+                )
+                try await wikiStore.regenerateIndex()
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Imported into knowledge base, but wiki page failed: \(error.localizedDescription)"
+                }
+            }
 
             await MainActor.run {
                 self.isImporting = false
@@ -104,6 +130,14 @@ final class DocumentsViewModel: @unchecked Sendable {
         }
     }
 
+    private func currentWikiStore() async -> WikiPageStore {
+        let workspace = await MainActor.run { workspaceManager.activeWorkspace }
+        if let workspace {
+            return WikiPageStore(workspaceURL: workspace.dataPath)
+        }
+        return WikiPageStore(workspaceSlug: "default")
+    }
+
     /// Change status filter and reload
     func setStatusFilter(_ status: DocumentStatus?) async {
         statusFilter = status
@@ -115,8 +149,12 @@ final class DocumentsViewModel: @unchecked Sendable {
 // MARK: - Documents View
 
 struct DocumentsView: View {
-    @State private var viewModel = DocumentsViewModel()
+    @State private var viewModel: DocumentsViewModel
     @State private var selectedStatusFilter: DocumentStatus? = nil
+
+    init(workspaceManager: WorkspaceManager = WorkspaceManager.shared) {
+        _viewModel = State(initialValue: DocumentsViewModel(workspaceManager: workspaceManager))
+    }
 
     var body: some View {
         ZStack {

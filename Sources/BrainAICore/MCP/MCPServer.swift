@@ -6,6 +6,7 @@ import Foundation
 public actor MCPServer {
 
     private let lightRAGClient: LightRAGClientProtocol
+    private let workspaceManager: WorkspaceManager
     private var isRunning = false
     private var transport: MCPTransport?
 
@@ -76,12 +77,95 @@ public actor MCPServer {
                 required: ["label"]
             )
         ),
+        MCPToolDefinition(
+            name: "brainai_wiki_search",
+            description: "Search BrainAI Markdown Wiki pages in the active or named workspace.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "query": MCPPropertySchema(type: "string", description: "Text to search for in wiki title, path, and markdown"),
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
+                ],
+                required: ["query"]
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_wiki_get_page",
+            description: "Read a BrainAI Markdown Wiki page by path or slug.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "path_or_slug": MCPPropertySchema(type: "string", description: "Wiki page path, filename, or slug"),
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
+                ],
+                required: ["path_or_slug"]
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_wiki_review_queue",
+            description: "List pending BrainAI Wiki review items for the active or named workspace.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)"),
+                    "status": MCPPropertySchema(type: "string", description: "Review status filter: needs_review, accepted, rejected, superseded, auto_accepted")
+                ],
+                required: []
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_wiki_append_log",
+            description: "Append a timestamped entry to the BrainAI workspace memory log. Use for quick, low-friction facts an agent learned.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "message": MCPPropertySchema(type: "string", description: "The fact or event to record in the workspace log"),
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
+                ],
+                required: ["message"]
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_wiki_create_note",
+            description: "Create a reviewable BrainAI Wiki memory page (concept, decision, entity, question, contradiction, user, synthesis, or inbox). The page is queued for human review unless auto_accept is true.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "title": MCPPropertySchema(type: "string", description: "Page title"),
+                    "body": MCPPropertySchema(type: "string", description: "Markdown body of the memory page (no H1 title or frontmatter)"),
+                    "kind": MCPPropertySchema(type: "string", description: "Page kind: concept (default), decision, entity, question, contradiction, user, synthesis, inbox"),
+                    "tags": MCPPropertySchema(type: "array", description: "Optional list of tag strings"),
+                    "source_links": MCPPropertySchema(type: "array", description: "Optional list of wiki page paths to cite as sources"),
+                    "confidence": MCPPropertySchema(type: "string", description: "Confidence label: low, medium (default), high"),
+                    "auto_accept": MCPPropertySchema(type: "boolean", description: "Store as auto_accepted instead of needs_review (default false)"),
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
+                ],
+                required: ["title", "body"]
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_wiki_record_source",
+            description: "Store an immutable raw source (note, chat, clip, document) in BrainAI memory and create a reviewable source page.",
+            inputSchema: MCPInputSchema(
+                properties: [
+                    "title": MCPPropertySchema(type: "string", description: "Source title"),
+                    "content": MCPPropertySchema(type: "string", description: "Full raw source text to preserve verbatim"),
+                    "source_type": MCPPropertySchema(type: "string", description: "Source type: note (default), chat, clip, document, asset"),
+                    "workspace": MCPPropertySchema(type: "string", description: "Workspace slug or name (optional, defaults to active workspace)")
+                ],
+                required: ["title", "content"]
+            )
+        ),
+        MCPToolDefinition(
+            name: "brainai_list_workspaces",
+            description: "List BrainAI workspaces (projects). Each workspace has its own isolated memory.",
+            inputSchema: MCPInputSchema(
+                properties: [:],
+                required: []
+            )
+        ),
     ]
 
     // MARK: - Initialization
 
-    public init(lightRAGClient: LightRAGClientProtocol) {
+    public init(lightRAGClient: LightRAGClientProtocol, workspaceManager: WorkspaceManager = .shared) {
         self.lightRAGClient = lightRAGClient
+        self.workspaceManager = workspaceManager
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
     }
@@ -100,14 +184,20 @@ public actor MCPServer {
                 let response = await handleRequest(request)
                 let responseData = try encoder.encode(response)
                 try await transport.send(responseData)
+            } catch is MCPServerTransportError {
+                // Transport closed (EOF) or unrecoverable write failure — stop serving
+                // rather than busy-looping on a dead connection.
+                break
             } catch {
                 if isRunning {
-                    // Log error but continue serving
+                    // Tolerate a single malformed/undecodable message and keep serving.
                     continue
                 }
                 break
             }
         }
+
+        isRunning = false
     }
 
     /// Stop the MCP server
@@ -192,6 +282,20 @@ public actor MCPServer {
             return try await executeCreateRelation(arguments)
         case "brainai_search":
             return try await executeSearch(arguments)
+        case "brainai_wiki_search":
+            return try await executeWikiSearch(arguments)
+        case "brainai_wiki_get_page":
+            return try await executeWikiGetPage(arguments)
+        case "brainai_wiki_review_queue":
+            return try await executeWikiReviewQueue(arguments)
+        case "brainai_wiki_append_log":
+            return try await executeWikiAppendLog(arguments)
+        case "brainai_wiki_create_note":
+            return try await executeWikiCreateNote(arguments)
+        case "brainai_wiki_record_source":
+            return try await executeWikiRecordSource(arguments)
+        case "brainai_list_workspaces":
+            return try executeListWorkspaces(arguments)
         default:
             throw MCPToolError.unknownTool(name)
         }
@@ -267,6 +371,234 @@ public actor MCPServer {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         let data = try encoder.encode(response)
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
+    private func executeWikiSearch(_ args: [String: AnyCodable]) async throws -> String {
+        guard let query = stringArgument("query", from: args), !query.isEmpty else {
+            throw MCPToolError.missingArgument("query")
+        }
+
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let pages = try await store.listPages()
+        let matches = pages
+            .filter {
+                $0.title.localizedCaseInsensitiveContains(query) ||
+                    $0.path.localizedCaseInsensitiveContains(query) ||
+                    $0.markdown.localizedCaseInsensitiveContains(query)
+            }
+            .prefix(20)
+            .map { page in
+                [
+                    "title": AnyCodable.string(page.title),
+                    "path": AnyCodable.string(page.path),
+                    "kind": AnyCodable.string(page.kind.rawValue),
+                    "updated_at": AnyCodable.string(ISO8601DateFormatter().string(from: page.updatedAt))
+                ]
+            }
+
+        let payload: [String: AnyCodable] = [
+            "query": .string(query),
+            "count": .int(matches.count),
+            "results": .array(matches.map { .object($0) })
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeWikiGetPage(_ args: [String: AnyCodable]) async throws -> String {
+        guard let selector = stringArgument("path_or_slug", from: args), !selector.isEmpty else {
+            throw MCPToolError.missingArgument("path_or_slug")
+        }
+
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let pages = try await store.listPages()
+        guard let page = pages.first(where: { page in
+            page.path == selector ||
+                page.slug == selector ||
+                page.path == "\(selector).md" ||
+                page.path.hasSuffix("/\(selector)") ||
+                page.path.hasSuffix("/\(selector).md")
+        }) else {
+            throw MCPToolError.executionFailed("Wiki page not found: \(selector)")
+        }
+
+        let payload: [String: AnyCodable] = [
+            "title": .string(page.title),
+            "path": .string(page.path),
+            "slug": .string(page.slug),
+            "kind": .string(page.kind.rawValue),
+            "markdown": .string(page.markdown)
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeWikiReviewQueue(_ args: [String: AnyCodable]) async throws -> String {
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let requestedStatus = stringArgument("status", from: args).flatMap(WikiReviewStatus.init(rawValue:))
+        let items = try await store.listReviewItems()
+            .filter { item in requestedStatus.map { status in item.status == status } ?? true }
+            .map { item in
+                [
+                    "id": AnyCodable.string(item.id.uuidString),
+                    "title": AnyCodable.string(item.title),
+                    "page_path": AnyCodable.string(item.pagePath),
+                    "status": AnyCodable.string(item.status.rawValue),
+                    "reason": AnyCodable.string(item.reason),
+                    "created_at": AnyCodable.string(ISO8601DateFormatter().string(from: item.createdAt))
+                ]
+            }
+
+        let payload: [String: AnyCodable] = [
+            "count": .int(items.count),
+            "results": .array(items.map { .object($0) })
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeWikiAppendLog(_ args: [String: AnyCodable]) async throws -> String {
+        guard let message = stringArgument("message", from: args), !message.isEmpty else {
+            throw MCPToolError.missingArgument("message")
+        }
+
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        try await store.appendLogEntry(message)
+
+        let payload: [String: AnyCodable] = [
+            "ok": .bool(true),
+            "message": .string(message)
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeWikiCreateNote(_ args: [String: AnyCodable]) async throws -> String {
+        guard let title = stringArgument("title", from: args), !title.isEmpty else {
+            throw MCPToolError.missingArgument("title")
+        }
+        guard let body = stringArgument("body", from: args), !body.isEmpty else {
+            throw MCPToolError.missingArgument("body")
+        }
+
+        let kind = stringArgument("kind", from: args).flatMap(WikiPageKind.init(rawValue:)) ?? .concept
+        let confidence = stringArgument("confidence", from: args) ?? "medium"
+        let tags = stringArrayArgument("tags", from: args)
+        let sourceLinks = stringArrayArgument("source_links", from: args)
+        let autoAccept = boolArgument("auto_accept", from: args) ?? false
+
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let page = try await store.createMemoryPage(
+            kind: kind,
+            title: title,
+            body: body,
+            confidence: confidence,
+            tags: tags,
+            sourceLinks: sourceLinks,
+            autoAccept: autoAccept
+        )
+
+        let payload: [String: AnyCodable] = [
+            "ok": .bool(true),
+            "path": .string(page.path),
+            "kind": .string(page.kind.rawValue),
+            "status": .string(autoAccept ? "auto_accepted" : "needs_review")
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeWikiRecordSource(_ args: [String: AnyCodable]) async throws -> String {
+        guard let title = stringArgument("title", from: args), !title.isEmpty else {
+            throw MCPToolError.missingArgument("title")
+        }
+        guard let content = stringArgument("content", from: args), !content.isEmpty else {
+            throw MCPToolError.missingArgument("content")
+        }
+
+        let sourceType = stringArgument("source_type", from: args) ?? "note"
+        let store = try wikiStore(for: stringArgument("workspace", from: args))
+        let page = try await store.createSourcePage(
+            title: title,
+            content: content,
+            sourceType: sourceType,
+            trackId: nil
+        )
+
+        let payload: [String: AnyCodable] = [
+            "ok": .bool(true),
+            "path": .string(page.path),
+            "source_type": .string(sourceType),
+            "status": .string("needs_review")
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func executeListWorkspaces(_ args: [String: AnyCodable]) throws -> String {
+        let activeID = workspaceManager.activeWorkspace?.id
+        let rows = workspaceManager.workspaces.map { ws in
+            [
+                "slug": AnyCodable.string(ws.slug),
+                "name": AnyCodable.string(ws.name),
+                "active": AnyCodable.bool(ws.id == activeID)
+            ]
+        }
+
+        let payload: [String: AnyCodable] = [
+            "count": .int(rows.count),
+            "results": .array(rows.map { .object($0) })
+        ]
+        return try encodeToolPayload(payload)
+    }
+
+    private func wikiStore(for workspaceSelector: String?) throws -> WikiPageStore {
+        if let workspaceSelector, !workspaceSelector.isEmpty {
+            guard let workspace = workspaceManager.workspaces.first(where: {
+                $0.slug == workspaceSelector || $0.name.localizedCaseInsensitiveCompare(workspaceSelector) == .orderedSame
+            }) else {
+                throw MCPToolError.executionFailed("Workspace not found: \(workspaceSelector)")
+            }
+            return WikiPageStore(workspaceURL: workspace.dataPath)
+        }
+
+        if let workspace = workspaceManager.activeWorkspace {
+            return WikiPageStore(workspaceURL: workspace.dataPath)
+        }
+
+        return WikiPageStore(workspaceSlug: "default")
+    }
+
+    private func stringArgument(_ name: String, from args: [String: AnyCodable]) -> String? {
+        guard case .string(let value) = args[name] else { return nil }
+        return value
+    }
+
+    private func boolArgument(_ name: String, from args: [String: AnyCodable]) -> Bool? {
+        switch args[name] {
+        case .bool(let value): return value
+        case .string(let value): return (value as NSString).boolValue
+        default: return nil
+        }
+    }
+
+    private func stringArrayArgument(_ name: String, from args: [String: AnyCodable]) -> [String] {
+        switch args[name] {
+        case .array(let values):
+            return values.compactMap { element in
+                if case .string(let value) = element { return value }
+                return nil
+            }
+        case .string(let value):
+            // Accept a comma-separated string as a convenience.
+            return value
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        default:
+            return []
+        }
+    }
+
+    private func encodeToolPayload(_ payload: [String: AnyCodable]) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(payload)
         return String(data: data, encoding: .utf8) ?? "{}"
     }
 }

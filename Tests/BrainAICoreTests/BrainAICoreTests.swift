@@ -225,6 +225,82 @@ final class ModelTests: XCTestCase {
     }
 }
 
+// MARK: - WorkspaceManagerTests
+
+final class WorkspaceManagerTests: XCTestCase {
+    private var workspaceRoot: URL!
+    private var originalDefaultWorkspaceID: String!
+
+    override func setUpWithError() throws {
+        workspaceRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BrainAIWorkspaceManagerTests-\(UUID().uuidString)", isDirectory: true)
+        originalDefaultWorkspaceID = AppConfiguration.shared.defaultWorkspaceID
+        AppConfiguration.shared.defaultWorkspaceID = ""
+    }
+
+    override func tearDownWithError() throws {
+        AppConfiguration.shared.defaultWorkspaceID = originalDefaultWorkspaceID
+        if let workspaceRoot, FileManager.default.fileExists(atPath: workspaceRoot.path) {
+            try FileManager.default.removeItem(at: workspaceRoot)
+        }
+    }
+
+    func testCreateFirstWorkspaceMakesItActiveAndKeepsSecondInactive() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+
+        let first = try await manager.create(name: "First Workspace", slug: "first")
+        let second = try await manager.create(name: "Second Workspace", slug: "second")
+
+        XCTAssertEqual(manager.activeWorkspace?.id, first.id)
+        XCTAssertNotEqual(manager.activeWorkspace?.id, second.id)
+        XCTAssertEqual(AppConfiguration.shared.defaultWorkspaceID, first.id.uuidString)
+    }
+
+    func testSetActivePersistsDefaultWorkspaceForReload() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "First Workspace", slug: "first")
+        let second = try await manager.create(name: "Second Workspace", slug: "second")
+
+        try await manager.setActive(id: second.id)
+
+        XCTAssertEqual(manager.activeWorkspace?.id, second.id)
+        XCTAssertEqual(AppConfiguration.shared.defaultWorkspaceID, second.id.uuidString)
+
+        let reloaded = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        try await waitUntil {
+            reloaded.workspaces.count == 2
+        }
+
+        XCTAssertEqual(reloaded.activeWorkspace?.id, second.id)
+    }
+
+    func testDeleteActiveWorkspaceFallsBackToRemainingWorkspace() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let first = try await manager.create(name: "First Workspace", slug: "first")
+        let second = try await manager.create(name: "Second Workspace", slug: "second")
+
+        try await manager.setActive(id: second.id)
+        try await manager.delete(id: second.id)
+
+        XCTAssertEqual(manager.activeWorkspace?.id, first.id)
+        XCTAssertEqual(AppConfiguration.shared.defaultWorkspaceID, first.id.uuidString)
+        XCTAssertEqual(manager.workspaces.map(\.id), [first.id])
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        condition: @escaping () -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(condition(), file: file, line: line)
+    }
+}
+
 // MARK: - RoleConfigTests
 
 final class RoleConfigTests: XCTestCase {
@@ -1007,7 +1083,7 @@ final class MCPProtocolTests: XCTestCase {
     func testMCPServerToolDefinitions() {
         let tools = MCPServer.toolDefinitions
 
-        XCTAssertEqual(tools.count, 5)
+        XCTAssertEqual(tools.count, 12)
 
         let toolNames = tools.map(\.name)
         XCTAssertTrue(toolNames.contains("brainai_query"))
@@ -1015,6 +1091,13 @@ final class MCPProtocolTests: XCTestCase {
         XCTAssertTrue(toolNames.contains("brainai_create_entity"))
         XCTAssertTrue(toolNames.contains("brainai_create_relation"))
         XCTAssertTrue(toolNames.contains("brainai_search"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_search"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_get_page"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_review_queue"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_append_log"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_create_note"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_record_source"))
+        XCTAssertTrue(toolNames.contains("brainai_list_workspaces"))
 
         // Verify query tool has required "question" field
         let queryTool = tools.first { $0.name == "brainai_query" }
@@ -1038,6 +1121,15 @@ final class MCPProtocolTests: XCTestCase {
         // Verify search requires label
         let searchTool = tools.first { $0.name == "brainai_search" }
         XCTAssertEqual(searchTool?.inputSchema.required, ["label"])
+
+        let wikiSearchTool = tools.first { $0.name == "brainai_wiki_search" }
+        XCTAssertEqual(wikiSearchTool?.inputSchema.required, ["query"])
+
+        let wikiGetPageTool = tools.first { $0.name == "brainai_wiki_get_page" }
+        XCTAssertEqual(wikiGetPageTool?.inputSchema.required, ["path_or_slug"])
+
+        let wikiReviewQueueTool = tools.first { $0.name == "brainai_wiki_review_queue" }
+        XCTAssertEqual(wikiReviewQueueTool?.inputSchema.required, [])
     }
 
     func testMCPToolErrorDescriptions() {
@@ -1106,6 +1198,432 @@ final class MCPProtocolTests: XCTestCase {
 
         if case .object(let obj) = decoded["object"] { XCTAssertNotNil(obj["nested"]) }
         else { XCTFail("Expected object") }
+    }
+}
+
+// MARK: - MCP Wiki Tool Execution Tests
+
+final class MCPWikiToolExecutionTests: XCTestCase {
+    private var workspaceRoot: URL!
+
+    override func setUpWithError() throws {
+        workspaceRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BrainAIMCPWikiToolTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        if let workspaceRoot, FileManager.default.fileExists(atPath: workspaceRoot.path) {
+            try FileManager.default.removeItem(at: workspaceRoot)
+        }
+    }
+
+    func testWikiToolsReadFromNamedWorkspace() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let alpha = try await manager.create(name: "Alpha Workspace", slug: "alpha")
+        let beta = try await manager.create(name: "Beta Workspace", slug: "beta")
+
+        _ = try await WikiPageStore(workspaceURL: alpha.dataPath).createSynthesisPage(
+            title: "Alpha Memory",
+            question: "Where should alpha-only memory live?",
+            answer: "Only in alpha.",
+            ragContext: nil,
+            model: nil,
+            searchMode: .hybrid
+        )
+        let betaPage = try await WikiPageStore(workspaceURL: beta.dataPath).createSynthesisPage(
+            title: "Beta Memory",
+            question: "Where should beta-only memory live?",
+            answer: "Only in beta.",
+            ragContext: "Beta evidence context",
+            model: "test-model",
+            searchMode: .local
+        )
+
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+        let search = try await callTool(
+            server,
+            name: "brainai_wiki_search",
+            arguments: [
+                "query": .string("Beta Memory"),
+                "workspace": .string("beta")
+            ]
+        )
+        let searchPayload = try toolPayload(from: search)
+        XCTAssertEqual(intValue(searchPayload["count"]), 1)
+
+        let pageResponse = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: [
+                "path_or_slug": .string(betaPage.slug),
+                "workspace": .string("Beta Workspace")
+            ]
+        )
+        let pagePayload = try toolPayload(from: pageResponse)
+        XCTAssertEqual(stringValue(pagePayload["path"]), betaPage.path)
+        XCTAssertTrue(stringValue(pagePayload["markdown"])?.contains("Only in beta.") ?? false)
+
+        let reviewResponse = try await callTool(
+            server,
+            name: "brainai_wiki_review_queue",
+            arguments: [
+                "workspace": .string("beta"),
+                "status": .string(WikiReviewStatus.needsReview.rawValue)
+            ]
+        )
+        let reviewPayload = try toolPayload(from: reviewResponse)
+        XCTAssertEqual(intValue(reviewPayload["count"]), 1)
+    }
+
+    func testWikiToolReturnsErrorForUnknownNamedWorkspace() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let active = try await manager.create(name: "Active Workspace", slug: "active")
+        _ = try await WikiPageStore(workspaceURL: active.dataPath).createSynthesisPage(
+            title: "Active Memory",
+            question: "Should this leak through unknown workspace lookups?",
+            answer: "No.",
+            ragContext: nil,
+            model: nil,
+            searchMode: .hybrid
+        )
+
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_search",
+            arguments: [
+                "query": .string("Active Memory"),
+                "workspace": .string("missing-workspace")
+            ]
+        )
+
+        XCTAssertNil(response.result)
+        XCTAssertEqual(response.error?.code, -32000)
+        XCTAssertTrue(response.error?.message.contains("Workspace not found: missing-workspace") ?? false)
+    }
+
+    func testWikiCreateNoteToolWritesReviewablePage() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Notes WS", slug: "notes")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_create_note",
+            arguments: [
+                "title": .string("Use qwen2.5 for extraction"),
+                "body": .string("We decided to use qwen2.5:14b for the extraction role."),
+                "kind": .string("decision"),
+                "tags": .array([.string("llm"), .string("config")]),
+                "workspace": .string("notes")
+            ]
+        )
+        let payload = try toolPayload(from: response)
+        XCTAssertEqual(stringValue(payload["status"]), "needs_review")
+        XCTAssertEqual(stringValue(payload["kind"]), "decision")
+        let path = try XCTUnwrap(stringValue(payload["path"]))
+        XCTAssertTrue(path.hasPrefix("decisions/"), "decision pages live under decisions/, got \(path)")
+
+        // The new page is queued for human review.
+        let review = try await callTool(
+            server,
+            name: "brainai_wiki_review_queue",
+            arguments: ["workspace": .string("notes")]
+        )
+        XCTAssertEqual(intValue(try toolPayload(from: review)["count"]), 1)
+
+        // And is readable back with its content and frontmatter.
+        let page = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: ["path_or_slug": .string(path), "workspace": .string("notes")]
+        )
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: page)["markdown"]))
+        XCTAssertTrue(markdown.contains("qwen2.5:14b"))
+        XCTAssertTrue(markdown.contains("type: decision"))
+    }
+
+    func testWikiCreateNoteToolCanAutoAccept() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Auto WS", slug: "auto")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_create_note",
+            arguments: [
+                "title": .string("Trusted fact"),
+                "body": .string("This was auto accepted."),
+                "auto_accept": .bool(true),
+                "workspace": .string("auto")
+            ]
+        )
+        XCTAssertEqual(stringValue(try toolPayload(from: response)["status"]), "auto_accepted")
+    }
+
+    func testWikiAppendLogToolRecordsEntry() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Log WS", slug: "logws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_append_log",
+            arguments: [
+                "message": .string("Fixed the I2C sensor timing bug"),
+                "workspace": .string("logws")
+            ]
+        )
+        XCTAssertEqual(boolValue(try toolPayload(from: response)["ok"]), true)
+
+        let logPage = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: ["path_or_slug": .string("log.md"), "workspace": .string("logws")]
+        )
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: logPage)["markdown"]))
+        XCTAssertTrue(markdown.contains("Fixed the I2C sensor timing bug"))
+    }
+
+    func testWikiRecordSourceToolCreatesSourcePage() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Src WS", slug: "srcws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_record_source",
+            arguments: [
+                "title": .string("Meeting notes 2026-06-15"),
+                "content": .string("Decided to ship the memory feature today."),
+                "source_type": .string("note"),
+                "workspace": .string("srcws")
+            ]
+        )
+        let path = try XCTUnwrap(stringValue(try toolPayload(from: response)["path"]))
+        XCTAssertTrue(path.hasPrefix("sources/"), "source pages live under sources/, got \(path)")
+
+        let review = try await callTool(
+            server,
+            name: "brainai_wiki_review_queue",
+            arguments: ["workspace": .string("srcws")]
+        )
+        XCTAssertEqual(intValue(try toolPayload(from: review)["count"]), 1)
+    }
+
+    func testListWorkspacesToolReportsAllWorkspaces() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let first = try await manager.create(name: "First", slug: "first")
+        _ = try await manager.create(name: "Second", slug: "second")
+        try await manager.setActive(id: first.id)
+
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+        let response = try await callTool(server, name: "brainai_list_workspaces", arguments: [:])
+        let payload = try toolPayload(from: response)
+        XCTAssertEqual(intValue(payload["count"]), 2)
+
+        guard case .array(let rows) = payload["results"] else {
+            return XCTFail("results should be an array")
+        }
+        let activeSlugs: [String] = rows.compactMap { row in
+            guard case .object(let obj) = row,
+                  case .bool(true) = obj["active"],
+                  case .string(let slug) = obj["slug"] else { return nil }
+            return slug
+        }
+        XCTAssertEqual(activeSlugs, ["first"])
+    }
+
+    private func callTool(
+        _ server: MCPServer,
+        name: String,
+        arguments: [String: AnyCodable]
+    ) async throws -> MCPResponse {
+        let request = MCPRequest(
+            id: 1,
+            method: "tools/call",
+            params: MCPParams(name: name, arguments: arguments)
+        )
+        let requestData = try JSONEncoder().encode(request)
+        let transport = TestMCPTransport(requests: [requestData])
+        let serverTask = Task {
+            try await server.start(transport: transport)
+        }
+
+        let responseData = await transport.waitForSent()
+        await server.stop()
+        try await serverTask.value
+        return try JSONDecoder().decode(MCPResponse.self, from: responseData)
+    }
+
+    private func toolPayload(from response: MCPResponse) throws -> [String: AnyCodable] {
+        XCTAssertNil(response.error)
+        let text = try XCTUnwrap(response.result?.content?.first?.text)
+        let data = try XCTUnwrap(text.data(using: .utf8))
+        return try JSONDecoder().decode([String: AnyCodable].self, from: data)
+    }
+
+    private func stringValue(_ value: AnyCodable?) -> String? {
+        guard case .string(let string) = value else { return nil }
+        return string
+    }
+
+    private func intValue(_ value: AnyCodable?) -> Int? {
+        guard case .int(let int) = value else { return nil }
+        return int
+    }
+
+    private func boolValue(_ value: AnyCodable?) -> Bool? {
+        guard case .bool(let bool) = value else { return nil }
+        return bool
+    }
+}
+
+// MARK: - MCP WebSocket Server Integration
+
+final class MCPWebSocketServerTests: XCTestCase {
+    private var workspaceRoot: URL!
+
+    override func setUpWithError() throws {
+        workspaceRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BrainAIMCPWSTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        if let workspaceRoot, FileManager.default.fileExists(atPath: workspaceRoot.path) {
+            try FileManager.default.removeItem(at: workspaceRoot)
+        }
+    }
+
+    func testWebSocketServerServesToolsOverLoopback() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "WS Host", slug: "wshost")
+
+        // Pick a high port to reduce collision risk on shared CI runners.
+        let port: UInt16 = 8779
+        let server = MCPWebSocketServer(
+            port: port,
+            workspaceManager: manager,
+            makeClient: { TestLightRAGClient() }
+        )
+
+        do {
+            try server.start()
+        } catch {
+            throw XCTSkip("Could not bind MCP WebSocket server on port \(port): \(error)")
+        }
+        defer { server.stop() }
+
+        let transport = WebSocketTransport(url: URL(string: "ws://127.0.0.1:\(port)")!)
+        transport.connect()
+        defer { Task { await transport.close() } }
+
+        // Send tools/list and expect all 12 tools back.
+        let request = MCPRequest(id: 7, method: "tools/list")
+        try await transport.send(try JSONEncoder().encode(request))
+        let responseData = try await transport.receive()
+        let response = try JSONDecoder().decode(MCPResponse.self, from: responseData)
+
+        XCTAssertNil(response.error)
+        XCTAssertEqual(response.id, 7)
+        let toolCount = response.result?.tools?.count ?? 0
+        XCTAssertEqual(toolCount, 12, "WebSocket server should expose the full tool set")
+    }
+}
+
+private actor TestMCPTransport: MCPTransport {
+    private var requests: [Data]
+    private var sentResponses: [Data] = []
+    private var receiveWaiters: [CheckedContinuation<Data, Error>] = []
+    private var sendWaiters: [CheckedContinuation<Data, Never>] = []
+    private var isClosed = false
+
+    init(requests: [Data]) {
+        self.requests = requests
+    }
+
+    func receive() async throws -> Data {
+        if !requests.isEmpty {
+            return requests.removeFirst()
+        }
+
+        if isClosed {
+            throw CancellationError()
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            receiveWaiters.append(continuation)
+        }
+    }
+
+    func send(_ data: Data) async throws {
+        if sendWaiters.isEmpty {
+            sentResponses.append(data)
+        } else {
+            sendWaiters.removeFirst().resume(returning: data)
+        }
+    }
+
+    func close() async {
+        isClosed = true
+        for waiter in receiveWaiters {
+            waiter.resume(throwing: CancellationError())
+        }
+        receiveWaiters.removeAll()
+    }
+
+    func waitForSent() async -> Data {
+        if !sentResponses.isEmpty {
+            return sentResponses.removeFirst()
+        }
+
+        return await withCheckedContinuation { continuation in
+            sendWaiters.append(continuation)
+        }
+    }
+}
+
+private final class TestLightRAGClient: LightRAGClientProtocol, @unchecked Sendable {
+    func query(_ question: String, mode: SearchMode, topK: Int, onlyNeedContext: Bool) async throws -> QueryResponse {
+        QueryResponse(response: "test response")
+    }
+
+    func insertText(_ text: String, description: String) async throws -> InsertTextResponse {
+        InsertTextResponse(status: "ok", message: "inserted", trackId: "test-track")
+    }
+
+    func createEntity(_ request: EntityCreateRequest) async throws {}
+
+    func createRelation(_ request: RelationCreateRequest) async throws {}
+
+    func deleteEntity(_ name: String) async throws {}
+
+    func listDocuments(page: Int, pageSize: Int, status: String?) async throws -> DocumentListResponse {
+        DocumentListResponse(documents: [], total: 0, page: page, pageSize: pageSize, hasMore: false)
+    }
+
+    func healthCheck() async throws -> HealthResponse {
+        HealthResponse(status: "ok")
+    }
+
+    func getGraphLabels() async throws -> GraphLabelsResponse {
+        GraphLabelsResponse(entityLabels: [], relationLabels: [])
+    }
+
+    func searchGraphLabels(query: String, limit: Int) async throws -> [String] {
+        []
+    }
+
+    func searchGraph(label: String, searchText: String, maxItems: Int) async throws -> GraphSearchResponse {
+        GraphSearchResponse(nodes: [], edges: [])
+    }
+
+    func getEntity(_ name: String) async throws -> GraphNodeData {
+        GraphNodeData(name: name)
+    }
+
+    func queryData(_ question: String, mode: SearchMode, topK: Int) async throws -> QueryDataResponse {
+        QueryDataResponse()
     }
 }
 
@@ -1200,5 +1718,166 @@ final class HTTPClientErrorTests: XCTestCase {
         XCTAssertTrue(HTTPClientError.networkError("no internet").errorDescription?.contains("no internet") ?? false)
         XCTAssertEqual(HTTPClientError.unauthorized.errorDescription, "Authentication failed (401 Unauthorized)")
         XCTAssertTrue(HTTPClientError.tlsPinningFailed.errorDescription?.contains("TLS") ?? false)
+    }
+}
+
+// MARK: - Wiki Memory Store Tests
+
+final class WikiMemoryStoreTests: XCTestCase {
+    private var workspaceURL: URL!
+
+    override func setUpWithError() throws {
+        workspaceURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BrainAIWikiStoreTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        if let workspaceURL, FileManager.default.fileExists(atPath: workspaceURL.path) {
+            try FileManager.default.removeItem(at: workspaceURL)
+        }
+    }
+
+    func testEnsureScaffoldCreatesRawWikiSchemaAndMetadataFolders() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+
+        try await store.ensureScaffold()
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspaceURL.appendingPathComponent("raw/documents").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspaceURL.appendingPathComponent("wiki/sources").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspaceURL.appendingPathComponent("schema/MEMORY_SCHEMA.md").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: workspaceURL.appendingPathComponent("metadata").path))
+    }
+
+    func testCreateSourcePagePreservesRawSourceAndQueuesReview() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+        let content = "Persistent memory needs raw sources plus compiled wiki pages."
+
+        let page = try await store.createSourcePage(
+            title: "Memory Note",
+            content: content,
+            sourceType: "note",
+            trackId: "track-1"
+        )
+
+        let manifest = try await store.listSourceManifestEntries()
+        let reviews = try await store.listReviewItems()
+
+        XCTAssertEqual(page.kind, .source)
+        XCTAssertTrue(page.markdown.contains("status: needs_review"))
+        XCTAssertEqual(manifest.count, 1)
+        XCTAssertEqual(manifest.first?.sourceType, "note")
+        XCTAssertEqual(manifest.first?.lightRAGTrackID, "track-1")
+        XCTAssertNotNil(manifest.first?.rawPath)
+        XCTAssertNotNil(manifest.first?.checksum)
+        XCTAssertEqual(manifest.first?.byteCount, Data(content.utf8).count)
+        XCTAssertEqual(reviews.count, 1)
+        XCTAssertEqual(reviews.first?.status, .needsReview)
+
+        let rawContent = try await store.readRawSource(for: try XCTUnwrap(manifest.first))
+        XCTAssertEqual(rawContent, content)
+    }
+
+    func testCreateSynthesisPageQueuesReview() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+
+        let page = try await store.createSynthesisPage(
+            title: "Hybrid Memory Direction",
+            question: "What should BrainAI build next?",
+            answer: "Build a reviewable compiled memory layer over LightRAG.",
+            ragContext: "LightRAG handles retrieval. Wiki pages hold stable reviewed knowledge.",
+            model: "qwen2.5:14b",
+            searchMode: .hybrid
+        )
+        let reviews = try await store.listReviewItems()
+
+        XCTAssertEqual(page.kind, .synthesis)
+        XCTAssertEqual(page.path, "syntheses/hybrid-memory-direction.md")
+        XCTAssertTrue(page.markdown.contains("type: synthesis"))
+        XCTAssertTrue(page.markdown.contains("status: needs_review"))
+        XCTAssertTrue(page.markdown.contains("search_mode: hybrid"))
+        XCTAssertTrue(page.markdown.contains("## Retrieved Context"))
+        XCTAssertEqual(reviews.count, 1)
+        XCTAssertEqual(reviews.first?.pagePath, page.path)
+        XCTAssertEqual(reviews.first?.status, .needsReview)
+    }
+
+    func testUpdateReviewItemStatusUpdatesQueueAndPageFrontmatter() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+        let page = try await store.createSynthesisPage(
+            title: "Reviewable Memory",
+            question: "What should review do?",
+            answer: "Review should update both queue metadata and page frontmatter.",
+            ragContext: nil,
+            model: nil,
+            searchMode: .hybrid
+        )
+        let reviews = try await store.listReviewItems()
+        let review = try XCTUnwrap(reviews.first)
+
+        try await store.updateReviewItemStatus(id: review.id, status: .accepted)
+
+        let updatedReviews = try await store.listReviewItems()
+        let updatedReview = try XCTUnwrap(updatedReviews.first)
+        let updatedPage = try await store.readPage(at: page.path)
+
+        XCTAssertEqual(updatedReview.status, .accepted)
+        XCTAssertEqual(updatedPage.frontmatter["status"], WikiReviewStatus.accepted.rawValue)
+        XCTAssertTrue(updatedPage.markdown.contains("status: accepted"))
+    }
+
+    func testRegenerateIndexIncludesCreatedPagesByKind() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+        let source = try await store.createSourcePage(
+            title: "Indexed Source",
+            content: "Index this source page.",
+            sourceType: "note",
+            trackId: nil
+        )
+        let synthesis = try await store.createSynthesisPage(
+            title: "Indexed Synthesis",
+            question: "Should synthesis appear in the index?",
+            answer: "Yes.",
+            ragContext: nil,
+            model: nil,
+            searchMode: .mix
+        )
+
+        try await store.regenerateIndex()
+
+        let index = try await store.readPage(at: "index.md")
+        XCTAssertTrue(index.markdown.contains("## Source"))
+        XCTAssertTrue(index.markdown.contains("[[\(source.path)]] Indexed Source"))
+        XCTAssertTrue(index.markdown.contains("## Synthesis"))
+        XCTAssertTrue(index.markdown.contains("[[\(synthesis.path)]] Indexed Synthesis"))
+    }
+
+    func testWikiSyncStateTracksPageChecksumAndTrackID() async throws {
+        let store = WikiPageStore(workspaceURL: workspaceURL)
+        let page = try await store.createSynthesisPage(
+            title: "Synced Memory",
+            question: "What changed?",
+            answer: "Accepted wiki pages are synced back into retrieval.",
+            ragContext: nil,
+            model: nil,
+            searchMode: .local
+        )
+
+        let initiallyNeedsSync = try await store.needsLightRAGSync(page)
+        XCTAssertTrue(initiallyNeedsSync)
+
+        try await store.recordLightRAGSync(page: page, trackId: "track-sync-1")
+        let optionalState = try await store.syncState(for: page)
+        let state = try XCTUnwrap(optionalState)
+
+        let needsSyncAfterRecord = try await store.needsLightRAGSync(page)
+        XCTAssertFalse(needsSyncAfterRecord)
+        XCTAssertEqual(state.pagePath, page.path)
+        XCTAssertEqual(state.lightRAGTrackID, "track-sync-1")
+        XCTAssertFalse(state.checksum.isEmpty)
+
+        var changedPage = page
+        changedPage.markdown += "\n\nNew accepted detail."
+        let changedPageNeedsSync = try await store.needsLightRAGSync(changedPage)
+        XCTAssertTrue(changedPageNeedsSync)
     }
 }

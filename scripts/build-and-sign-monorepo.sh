@@ -21,7 +21,7 @@ if [[ ! -f "$INNER" ]]; then
   exit 1
 fi
 
-export VERSION="${1:-${VERSION:-0.1.6}}"
+export VERSION="${1:-${VERSION:-0.1.7}}"
 SKIP_SIGNING="${SKIP_SIGNING:-false}"
 SKIP_NOTARIZE="${SKIP_NOTARIZE:-false}"
 export DIST="${DIST:-$REPO_ROOT/dist}"

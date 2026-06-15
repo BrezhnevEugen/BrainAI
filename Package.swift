@@ -33,6 +33,10 @@ let package = Package(
             name: "BrainAIInstaller",
             targets: ["BrainAIInstaller"]
         ),
+        .executable(
+            name: "BrainAIMCP",
+            targets: ["BrainAIMCP"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess.git", from: "4.2.2"),
@@ -88,6 +92,13 @@ let package = Package(
             resources: [
                 .process("Resources"),
             ]
+        ),
+
+        // MARK: - MCP Server (standalone stdio binary for external agents)
+        .executableTarget(
+            name: "BrainAIMCP",
+            dependencies: ["BrainAICore"],
+            path: "Sources/BrainAIMCP"
         ),
 
         // MARK: - Tests

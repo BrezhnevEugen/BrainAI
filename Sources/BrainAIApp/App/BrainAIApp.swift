@@ -12,6 +12,7 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
     case chat
     case search
     case notes
+    case wiki
     case documents
     case settings
 
@@ -24,6 +25,7 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
         case .chat: L10n.Nav.chat
         case .search: L10n.Nav.search
         case .notes: L10n.Nav.notes
+        case .wiki: L10n.Nav.wiki
         case .documents: L10n.Nav.documents
         case .settings: L10n.Nav.settings
         }
@@ -36,6 +38,7 @@ enum SidebarSection: String, CaseIterable, Hashable, Identifiable {
         case .chat: "bubble.left.and.bubble.right"
         case .search: "magnifyingglass"
         case .notes: "note.text"
+        case .wiki: "book.pages"
         case .documents: "doc.on.doc"
         case .settings: "gearshape"
         }
@@ -49,6 +52,7 @@ struct BrainAIAppContentView: View {
     @State private var selectedTab: SidebarSection? = .dashboard
     @State private var settingsSectionTab: SettingsTab = .general
     @State private var showSearchOverlay = false
+    @State private var workspaceManager = WorkspaceManager.shared
 
     var body: some View {
         NavigationSplitView {
@@ -125,7 +129,7 @@ struct BrainAIAppContentView: View {
     private var detailView: some View {
         switch selectedTab {
         case .dashboard:
-            DashboardView()
+            DashboardView(workspaceManager: workspaceManager)
         case .graph:
             KnowledgeGraphView()
         case .chat:
@@ -133,9 +137,11 @@ struct BrainAIAppContentView: View {
         case .search:
             SearchView()
         case .notes:
-            NotesView()
+            NotesView(workspaceManager: workspaceManager)
+        case .wiki:
+            WikiView(workspaceManager: workspaceManager)
         case .documents:
-            DocumentsView()
+            DocumentsView(workspaceManager: workspaceManager)
         case .settings:
             SettingsContentView(selectedTab: $settingsSectionTab)
         case nil:

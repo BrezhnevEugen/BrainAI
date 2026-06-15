@@ -24,6 +24,9 @@ struct ServerTab: View {
     // MCP connections
     @State private var mcpManager = MCPClientManager()
 
+    // In-app MCP server (exposes memory to external agents over WebSocket)
+    @State private var mcpServer = MCPWebSocketServer.shared
+
     var body: some View {
         Form {
             // MARK: - Ollama Service
@@ -104,6 +107,71 @@ struct ServerTab: View {
                 }
             } header: {
                 Label("LightRAG", systemImage: "externaldrive.connected.to.line.below")
+            }
+
+            // MARK: - MCP Server (in-app, for external agents)
+            Section {
+                HStack {
+                    Text("Port")
+                    Spacer()
+                    TextField("", value: $config.mcpServerPort, format: .number.grouping(.never))
+                        .frame(width: 80)
+                        .multilineTextAlignment(.trailing)
+                        .disabled(mcpServer.isRunning)
+                }
+
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    if mcpServer.isRunning {
+                        Label("Running · \(mcpServer.activeConnections) client(s)", systemImage: "circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    } else {
+                        Label("Stopped", systemImage: "circle")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                    }
+                }
+
+                if mcpServer.isRunning {
+                    HStack {
+                        Text("Endpoint")
+                        Spacer()
+                        Text("ws://localhost:\(mcpServer.port)")
+                            .foregroundStyle(.secondary)
+                            .fontDesign(.monospaced)
+                            .textSelection(.enabled)
+                    }
+                }
+
+                if let error = mcpServer.lastError {
+                    HStack {
+                        Text("Error")
+                        Spacer()
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button("Start") {
+                        startMCPServer()
+                    }
+                    .disabled(mcpServer.isRunning)
+
+                    Button("Stop") {
+                        config.mcpServerEnabled = false
+                        mcpServer.stop()
+                    }
+                    .disabled(!mcpServer.isRunning)
+                }
+            } header: {
+                Label("MCP Server", systemImage: "point.3.connected.trianglepath.dotted")
+            } footer: {
+                Text("Expose this workspace's knowledge base and memory to external agents over WebSocket. For stdio clients (Cursor, Claude Desktop, Claude Code) use the BrainAIMCP binary — see docs/MCP_AGENTS.md.")
             }
 
             // MARK: - Connection Mode
@@ -373,6 +441,15 @@ struct ServerTab: View {
             lightRAGStatus = .running
         } catch {
             lightRAGStatus = .error(error.localizedDescription)
+        }
+    }
+
+    private func startMCPServer() {
+        do {
+            try mcpServer.start(port: UInt16(config.mcpServerPort))
+            config.mcpServerEnabled = true
+        } catch {
+            // The server publishes lastError; nothing else to surface here.
         }
     }
 }

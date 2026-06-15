@@ -46,11 +46,16 @@ final class NotesViewModel: @unchecked Sendable {
     // MARK: - Dependencies
 
     private let lightRAGClient: LocalLightRAGClient
+    private let workspaceManager: WorkspaceManager
 
     // MARK: - Initialization
 
-    init(lightRAGClient: LocalLightRAGClient = LocalLightRAGClient()) {
+    init(
+        lightRAGClient: LocalLightRAGClient = LocalLightRAGClient(),
+        workspaceManager: WorkspaceManager = WorkspaceManager.shared
+    ) {
         self.lightRAGClient = lightRAGClient
+        self.workspaceManager = workspaceManager
     }
 
     // MARK: - Computed Properties
@@ -104,10 +109,25 @@ final class NotesViewModel: @unchecked Sendable {
 
         Task {
             do {
-                _ = try await lightRAGClient.insertText(
+                let response = try await lightRAGClient.insertText(
                     note.content,
                     description: note.title
                 )
+
+                do {
+                    let wikiStore = await currentWikiStore()
+                    try await wikiStore.createSourcePage(
+                        title: note.title,
+                        content: note.content,
+                        sourceType: "note",
+                        trackId: response.trackId
+                    )
+                    try await wikiStore.regenerateIndex()
+                } catch {
+                    await MainActor.run {
+                        self.insertionError = "Inserted into knowledge base, but wiki page failed: \(error.localizedDescription)"
+                    }
+                }
 
                 await MainActor.run {
                     var syncedNote = note
@@ -122,6 +142,14 @@ final class NotesViewModel: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    private func currentWikiStore() async -> WikiPageStore {
+        let workspace = await MainActor.run { workspaceManager.activeWorkspace }
+        if let workspace {
+            return WikiPageStore(workspaceURL: workspace.dataPath)
+        }
+        return WikiPageStore(workspaceSlug: "default")
     }
 
     // MARK: - File Persistence
@@ -170,7 +198,11 @@ final class NotesViewModel: @unchecked Sendable {
 // MARK: - Notes View
 
 struct NotesView: View {
-    @State private var viewModel = NotesViewModel()
+    @State private var viewModel: NotesViewModel
+
+    init(workspaceManager: WorkspaceManager = WorkspaceManager.shared) {
+        _viewModel = State(initialValue: NotesViewModel(workspaceManager: workspaceManager))
+    }
 
     var body: some View {
         HSplitView {

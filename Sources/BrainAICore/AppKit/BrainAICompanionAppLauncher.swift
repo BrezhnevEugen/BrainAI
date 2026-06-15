@@ -10,6 +10,9 @@ public enum BrainAICompanionAppLauncher {
     /// Legacy **BrainAI Settings** bundle (thin launcher → main app).
     public static let settingsBundleIdentifier = "com.brainai.settings"
 
+    /// Menu bar companion app bundled inside BrainAI.app.
+    public static let trayBundleIdentifier = "com.brainai.tray"
+
     /// Distributed notification: main app selects the Settings section (same user session).
     public static let distributedOpenSettingsNotification = NSNotification.Name("com.brainai.OpenSettings")
 
@@ -44,6 +47,31 @@ public enum BrainAICompanionAppLauncher {
     /// Same as `openSettingsInMainApp()` (settings are no longer a separate full UI app).
     public static func openSettings() {
         openSettingsInMainApp()
+    }
+
+    /// Starts the embedded menu bar app without activating it.
+    public static func openTrayIfNeeded() {
+        if !NSRunningApplication.runningApplications(withBundleIdentifier: trayBundleIdentifier).isEmpty {
+            return
+        }
+
+        let mainAppURL = urlForBrainAIMainAppAncestorOrNil(from: Bundle.main.bundleURL) ?? Bundle.main.bundleURL
+        let embeddedTray = mainAppURL
+            .appendingPathComponent("Contents/Resources/BrainAIEmbedded/BrainAI Tray.app", isDirectory: true)
+
+        if FileManager.default.fileExists(atPath: embeddedTray.path) {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            task.arguments = [embeddedTray.path]
+            try? task.run()
+            return
+        }
+
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: trayBundleIdentifier) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = false
+            NSWorkspace.shared.openApplication(at: url, configuration: config) { _, _ in }
+        }
     }
 
     private static func openLegacySettingsCompanionFallback() {
