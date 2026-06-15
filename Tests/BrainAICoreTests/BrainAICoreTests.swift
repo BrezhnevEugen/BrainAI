@@ -1552,6 +1552,52 @@ final class MCPWikiToolExecutionTests: XCTestCase {
         XCTAssertTrue(contents.first?.text?.contains("unique-content-xyz") ?? false)
     }
 
+    func testReviewQueueFiltersByDomain() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "RQ WS", slug: "rqws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        _ = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Work item"), "body": .string("b1"),
+            "domain": .string("work"), "workspace": .string("rqws")
+        ])
+        _ = try await callTool(server, name: "brainai_wiki_create_note", arguments: [
+            "title": .string("Personal item"), "body": .string("b2"),
+            "domain": .string("personal"), "workspace": .string("rqws")
+        ])
+
+        let all = try await callTool(server, name: "brainai_wiki_review_queue", arguments: ["workspace": .string("rqws")])
+        XCTAssertEqual(intValue(try toolPayload(from: all)["count"]), 2)
+
+        let work = try await callTool(server, name: "brainai_wiki_review_queue", arguments: [
+            "workspace": .string("rqws"), "domain": .string("work")
+        ])
+        XCTAssertEqual(intValue(try toolPayload(from: work)["count"]), 1)
+    }
+
+    func testTemplateResources() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Tpl WS", slug: "tplws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let list = try await send(server, MCPRequest(id: 1, method: "resources/list"))
+        let resources = try XCTUnwrap(list.result?.resources)
+        let decisionURI = MCPServer.templateResourceURIPrefix + "decision"
+        XCTAssertTrue(resources.contains { $0.uri == decisionURI }, "decision template should be listed")
+
+        let read = try await send(server, MCPRequest(id: 2, method: "resources/read", params: MCPParams(uri: decisionURI)))
+        let text = try XCTUnwrap(read.result?.contents?.first?.text)
+        XCTAssertTrue(text.contains("## Decision"))
+        XCTAssertTrue(text.contains("## Consequences"))
+
+        // A kind without a template returns an error.
+        let bad = try await send(
+            server,
+            MCPRequest(id: 3, method: "resources/read", params: MCPParams(uri: MCPServer.templateResourceURIPrefix + "log"))
+        )
+        XCTAssertNotNil(bad.error)
+    }
+
     private func callTool(
         _ server: MCPServer,
         name: String,
