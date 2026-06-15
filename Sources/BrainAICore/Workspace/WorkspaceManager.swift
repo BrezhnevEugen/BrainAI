@@ -46,6 +46,12 @@ public final class WorkspaceManager: @unchecked Sendable {
         }
     }
 
+    /// Reload workspaces from disk. Useful for headless hosts (e.g. the MCP
+    /// server binary) that must ensure workspaces are loaded before serving.
+    public func reload() async {
+        await loadWorkspaces()
+    }
+
     // MARK: - Thread-safe accessors (sync only)
 
     private func lockedWorkspaces() -> [Workspace] {
@@ -100,6 +106,10 @@ public final class WorkspaceManager: @unchecked Sendable {
             }
             return ws
         }
+
+        // Initialize the per-workspace memory scaffold (raw/wiki/schema/metadata)
+        // so the workspace's memory is ready the moment it is created.
+        try? await WikiPageStore(workspaceURL: workspace.dataPath).ensureScaffold()
 
         try await saveWorkspaces()
         return workspace

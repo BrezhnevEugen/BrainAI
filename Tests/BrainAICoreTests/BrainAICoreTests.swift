@@ -1083,7 +1083,7 @@ final class MCPProtocolTests: XCTestCase {
     func testMCPServerToolDefinitions() {
         let tools = MCPServer.toolDefinitions
 
-        XCTAssertEqual(tools.count, 8)
+        XCTAssertEqual(tools.count, 12)
 
         let toolNames = tools.map(\.name)
         XCTAssertTrue(toolNames.contains("brainai_query"))
@@ -1094,6 +1094,10 @@ final class MCPProtocolTests: XCTestCase {
         XCTAssertTrue(toolNames.contains("brainai_wiki_search"))
         XCTAssertTrue(toolNames.contains("brainai_wiki_get_page"))
         XCTAssertTrue(toolNames.contains("brainai_wiki_review_queue"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_append_log"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_create_note"))
+        XCTAssertTrue(toolNames.contains("brainai_wiki_record_source"))
+        XCTAssertTrue(toolNames.contains("brainai_list_workspaces"))
 
         // Verify query tool has required "question" field
         let queryTool = tools.first { $0.name == "brainai_query" }
@@ -1298,6 +1302,138 @@ final class MCPWikiToolExecutionTests: XCTestCase {
         XCTAssertTrue(response.error?.message.contains("Workspace not found: missing-workspace") ?? false)
     }
 
+    func testWikiCreateNoteToolWritesReviewablePage() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Notes WS", slug: "notes")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_create_note",
+            arguments: [
+                "title": .string("Use qwen2.5 for extraction"),
+                "body": .string("We decided to use qwen2.5:14b for the extraction role."),
+                "kind": .string("decision"),
+                "tags": .array([.string("llm"), .string("config")]),
+                "workspace": .string("notes")
+            ]
+        )
+        let payload = try toolPayload(from: response)
+        XCTAssertEqual(stringValue(payload["status"]), "needs_review")
+        XCTAssertEqual(stringValue(payload["kind"]), "decision")
+        let path = try XCTUnwrap(stringValue(payload["path"]))
+        XCTAssertTrue(path.hasPrefix("decisions/"), "decision pages live under decisions/, got \(path)")
+
+        // The new page is queued for human review.
+        let review = try await callTool(
+            server,
+            name: "brainai_wiki_review_queue",
+            arguments: ["workspace": .string("notes")]
+        )
+        XCTAssertEqual(intValue(try toolPayload(from: review)["count"]), 1)
+
+        // And is readable back with its content and frontmatter.
+        let page = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: ["path_or_slug": .string(path), "workspace": .string("notes")]
+        )
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: page)["markdown"]))
+        XCTAssertTrue(markdown.contains("qwen2.5:14b"))
+        XCTAssertTrue(markdown.contains("type: decision"))
+    }
+
+    func testWikiCreateNoteToolCanAutoAccept() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Auto WS", slug: "auto")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_create_note",
+            arguments: [
+                "title": .string("Trusted fact"),
+                "body": .string("This was auto accepted."),
+                "auto_accept": .bool(true),
+                "workspace": .string("auto")
+            ]
+        )
+        XCTAssertEqual(stringValue(try toolPayload(from: response)["status"]), "auto_accepted")
+    }
+
+    func testWikiAppendLogToolRecordsEntry() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Log WS", slug: "logws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_append_log",
+            arguments: [
+                "message": .string("Fixed the I2C sensor timing bug"),
+                "workspace": .string("logws")
+            ]
+        )
+        XCTAssertEqual(boolValue(try toolPayload(from: response)["ok"]), true)
+
+        let logPage = try await callTool(
+            server,
+            name: "brainai_wiki_get_page",
+            arguments: ["path_or_slug": .string("log.md"), "workspace": .string("logws")]
+        )
+        let markdown = try XCTUnwrap(stringValue(try toolPayload(from: logPage)["markdown"]))
+        XCTAssertTrue(markdown.contains("Fixed the I2C sensor timing bug"))
+    }
+
+    func testWikiRecordSourceToolCreatesSourcePage() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "Src WS", slug: "srcws")
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+
+        let response = try await callTool(
+            server,
+            name: "brainai_wiki_record_source",
+            arguments: [
+                "title": .string("Meeting notes 2026-06-15"),
+                "content": .string("Decided to ship the memory feature today."),
+                "source_type": .string("note"),
+                "workspace": .string("srcws")
+            ]
+        )
+        let path = try XCTUnwrap(stringValue(try toolPayload(from: response)["path"]))
+        XCTAssertTrue(path.hasPrefix("sources/"), "source pages live under sources/, got \(path)")
+
+        let review = try await callTool(
+            server,
+            name: "brainai_wiki_review_queue",
+            arguments: ["workspace": .string("srcws")]
+        )
+        XCTAssertEqual(intValue(try toolPayload(from: review)["count"]), 1)
+    }
+
+    func testListWorkspacesToolReportsAllWorkspaces() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        let first = try await manager.create(name: "First", slug: "first")
+        _ = try await manager.create(name: "Second", slug: "second")
+        try await manager.setActive(id: first.id)
+
+        let server = MCPServer(lightRAGClient: TestLightRAGClient(), workspaceManager: manager)
+        let response = try await callTool(server, name: "brainai_list_workspaces", arguments: [:])
+        let payload = try toolPayload(from: response)
+        XCTAssertEqual(intValue(payload["count"]), 2)
+
+        guard case .array(let rows) = payload["results"] else {
+            return XCTFail("results should be an array")
+        }
+        let activeSlugs: [String] = rows.compactMap { row in
+            guard case .object(let obj) = row,
+                  case .bool(true) = obj["active"],
+                  case .string(let slug) = obj["slug"] else { return nil }
+            return slug
+        }
+        XCTAssertEqual(activeSlugs, ["first"])
+    }
+
     private func callTool(
         _ server: MCPServer,
         name: String,
@@ -1335,6 +1471,63 @@ final class MCPWikiToolExecutionTests: XCTestCase {
     private func intValue(_ value: AnyCodable?) -> Int? {
         guard case .int(let int) = value else { return nil }
         return int
+    }
+
+    private func boolValue(_ value: AnyCodable?) -> Bool? {
+        guard case .bool(let bool) = value else { return nil }
+        return bool
+    }
+}
+
+// MARK: - MCP WebSocket Server Integration
+
+final class MCPWebSocketServerTests: XCTestCase {
+    private var workspaceRoot: URL!
+
+    override func setUpWithError() throws {
+        workspaceRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BrainAIMCPWSTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        if let workspaceRoot, FileManager.default.fileExists(atPath: workspaceRoot.path) {
+            try FileManager.default.removeItem(at: workspaceRoot)
+        }
+    }
+
+    func testWebSocketServerServesToolsOverLoopback() async throws {
+        let manager = WorkspaceManager(workspacesDirectory: workspaceRoot)
+        _ = try await manager.create(name: "WS Host", slug: "wshost")
+
+        // Pick a high port to reduce collision risk on shared CI runners.
+        let port: UInt16 = 8779
+        let server = MCPWebSocketServer(
+            port: port,
+            workspaceManager: manager,
+            makeClient: { TestLightRAGClient() }
+        )
+
+        do {
+            try server.start()
+        } catch {
+            throw XCTSkip("Could not bind MCP WebSocket server on port \(port): \(error)")
+        }
+        defer { server.stop() }
+
+        let transport = WebSocketTransport(url: URL(string: "ws://127.0.0.1:\(port)")!)
+        transport.connect()
+        defer { Task { await transport.close() } }
+
+        // Send tools/list and expect all 12 tools back.
+        let request = MCPRequest(id: 7, method: "tools/list")
+        try await transport.send(try JSONEncoder().encode(request))
+        let responseData = try await transport.receive()
+        let response = try JSONDecoder().decode(MCPResponse.self, from: responseData)
+
+        XCTAssertNil(response.error)
+        XCTAssertEqual(response.id, 7)
+        let toolCount = response.result?.tools?.count ?? 0
+        XCTAssertEqual(toolCount, 12, "WebSocket server should expose the full tool set")
     }
 }
 

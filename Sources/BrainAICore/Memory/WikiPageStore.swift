@@ -376,6 +376,105 @@ public actor WikiPageStore {
         return page
     }
 
+    /// Append a single timestamped entry to the workspace memory log.
+    /// Low-friction memory for agents ("remember that …").
+    public func appendLogEntry(_ message: String) throws {
+        try ensureScaffold()
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw WikiPageStoreError.invalidPath("empty log message")
+        }
+        try appendLog(trimmed)
+    }
+
+    /// Create an agent-authored memory page of the given kind and queue it for review.
+    /// - Parameters:
+    ///   - kind: Target page kind (concept, decision, entity, question, contradiction, user, synthesis, inbox).
+    ///   - title: Human-readable page title.
+    ///   - body: Markdown body (without the H1 title or frontmatter).
+    ///   - confidence: Confidence label stored in frontmatter.
+    ///   - tags: Optional tags recorded in frontmatter.
+    ///   - sourceLinks: Optional wiki paths to cite as sources (rendered as backlinks).
+    ///   - reason: Human-readable reason recorded in the review queue.
+    ///   - autoAccept: When true, the page is stored as `auto_accepted` instead of `needs_review`.
+    /// - Returns: The created page.
+    @discardableResult
+    public func createMemoryPage(
+        kind: WikiPageKind,
+        title: String,
+        body: String,
+        confidence: String = "medium",
+        tags: [String] = [],
+        sourceLinks: [String] = [],
+        reason: String = "Created by an agent via MCP.",
+        autoAccept: Bool = false
+    ) throws -> WikiPage {
+        try ensureScaffold()
+
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else {
+            throw WikiPageStoreError.invalidPath("empty page title")
+        }
+
+        let folder = Self.defaultFolder(for: kind)
+        let slug = uniqueSlug(for: cleanTitle, in: folder)
+        let pagePath = "\(folder)/\(slug).md"
+        let now = ISO8601DateFormatter().string(from: Date())
+        let status: WikiReviewStatus = autoAccept ? .autoAccepted : .needsReview
+
+        var frontmatter = """
+        ---
+        type: \(kind.rawValue)
+        status: \(status.rawValue)
+        created_at: \(now)
+        updated_at: \(now)
+        confidence: \(confidence)
+        """
+
+        if !tags.isEmpty {
+            let list = tags.map { "\"\(Self.escapeYAML($0))\"" }.joined(separator: ", ")
+            frontmatter += "\ntags: [\(list)]"
+        }
+
+        frontmatter += "\n---"
+
+        var markdown = """
+        \(frontmatter)
+        # \(cleanTitle)
+
+        \(body.trimmingCharacters(in: .whitespacesAndNewlines))
+        """
+
+        let cleanedLinks = sourceLinks
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !cleanedLinks.isEmpty {
+            markdown += "\n\n## Sources\n\n"
+            for link in cleanedLinks {
+                markdown += "- [[\(link)]]\n"
+            }
+        }
+
+        let page = WikiPage(
+            path: pagePath,
+            slug: slug,
+            title: cleanTitle,
+            kind: kind,
+            markdown: markdown
+        )
+        try writePage(page)
+        try appendReviewItem(
+            WikiReviewItem(
+                title: "Review \(kind.displayName): \(cleanTitle)",
+                pagePath: pagePath,
+                status: status,
+                reason: reason
+            )
+        )
+        try appendLog("Created \(kind.rawValue) page [[\(pagePath)]] — \(cleanTitle)")
+        return page
+    }
+
     public func regenerateIndex() throws {
         let pages = try listPages().filter { $0.path != "index.md" && $0.path != "log.md" }
         let grouped = Dictionary(grouping: pages, by: \.kind)
@@ -553,6 +652,20 @@ private extension WikiPageStore {
         "questions",
         "user"
     ]
+
+    static func defaultFolder(for kind: WikiPageKind) -> String {
+        switch kind {
+        case .entity: "entities"
+        case .concept: "concepts"
+        case .source: "sources"
+        case .synthesis: "syntheses"
+        case .decision: "decisions"
+        case .contradiction: "contradictions"
+        case .question: "questions"
+        case .user: "user"
+        case .inbox, .index, .log, .unknown: "inbox"
+        }
+    }
 
     static let defaultRawFolders = [
         "documents",
