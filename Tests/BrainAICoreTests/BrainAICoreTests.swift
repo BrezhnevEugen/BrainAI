@@ -1531,6 +1531,87 @@ final class MCPWebSocketServerTests: XCTestCase {
     }
 }
 
+// MARK: - OpenAI-Compatible SSE Streaming
+
+final class OpenAICompatibleStreamingTests: XCTestCase {
+
+    func testStreamConcatenatesDeltas() async throws {
+        let sse = """
+        data: {"choices":[{"delta":{"content":"Hello"}}]}
+
+        data: {"choices":[{"delta":{"content":", "}}]}
+
+        data: {"choices":[{"delta":{"content":"world"}}]}
+
+        data: [DONE]
+
+        """
+        MockSSEURLProtocol.responseBody = Data(sse.utf8)
+        MockSSEURLProtocol.statusCode = 200
+
+        let stream = try await OpenAICompatibleStreaming.chatStream(
+            baseURL: "https://example.test/v1",
+            apiKey: "test-key",
+            model: "gpt-test",
+            prompt: "hi",
+            options: GenerateOptions(),
+            session: Self.mockSession()
+        )
+
+        var result = ""
+        for await delta in stream { result += delta }
+        XCTAssertEqual(result, "Hello, world")
+    }
+
+    func testStreamThrowsOnUnauthorized() async {
+        MockSSEURLProtocol.responseBody = Data(#"{"error":"invalid key"}"#.utf8)
+        MockSSEURLProtocol.statusCode = 401
+
+        do {
+            _ = try await OpenAICompatibleStreaming.chatStream(
+                baseURL: "https://example.test/v1",
+                apiKey: "bad",
+                model: "gpt-test",
+                prompt: "hi",
+                options: GenerateOptions(),
+                session: Self.mockSession()
+            )
+            XCTFail("expected an error on HTTP 401")
+        } catch {
+            // expected
+        }
+    }
+
+    private static func mockSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockSSEURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+}
+
+/// URLProtocol stub that returns a canned SSE body for streaming tests.
+final class MockSSEURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var responseBody = Data()
+    nonisolated(unsafe) static var statusCode = 200
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url ?? URL(string: "https://example.test")!,
+            statusCode: Self.statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "text/event-stream"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseBody)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 private actor TestMCPTransport: MCPTransport {
     private var requests: [Data]
     private var sentResponses: [Data] = []

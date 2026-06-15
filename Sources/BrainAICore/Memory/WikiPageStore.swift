@@ -697,6 +697,10 @@ private extension WikiPageStore {
     static let defaultMemorySchemaMarkdown = """
     # BrainAI Memory Schema
 
+    Persistent personal memory that spans sessions, agents (Cursor, Claude, Cowork), and
+    life domains. Sessions are ephemeral; this memory is not. Query it at the start of a
+    task and save durable facts as they appear.
+
     This workspace uses a two-layer memory model:
 
     - `raw/` stores immutable source text exactly as it was imported.
@@ -718,6 +722,52 @@ private extension WikiPageStore {
     - `rejected`: kept for audit, ignored for answers.
     - `superseded`: replaced by a newer page or claim.
     - `auto_accepted`: trusted by workspace automation rules.
+
+    ## Taxonomy
+
+    Use one consistent taxonomy across every agent so retrieval stays reliable.
+
+    ### Entity types
+
+    | Type | Purpose |
+    |------|---------|
+    | `Project` | Any project or product |
+    | `Technology` | Languages, frameworks, tools, hardware |
+    | `Component` | Modules, services, files, circuits |
+    | `Decision` | Architecture and design choices (with reasoning) |
+    | `Bug` | Bugs with symptoms, root cause, and solution |
+    | `Convention` | Rules and standards |
+    | `Person` | People (colleagues, contacts) |
+    | `Preference` | User preferences and habits |
+    | `Environment` | Hardware, OS, configs |
+    | `Snippet` | Reusable code patterns |
+    | `Resource` | Useful links, docs, references |
+
+    ### Relation patterns
+
+    `Project → uses → Technology`, `Component → belongs_to → Project`,
+    `Decision → affects → Component`, `Bug → found_in → Component`,
+    `Person → prefers → Preference`, `Person → works_on → Project`,
+    `Technology → compatible_with → Technology`, `Snippet → applies_to → Technology`,
+    `Project → depends_on → Technology`.
+
+    ### Description / tag format
+
+    Tag durable facts as `domain/category-topic`.
+
+    - Domains: `work`, `personal-project`, `hobby-*` (e.g. `hobby-esp32`), `personal`.
+    - Categories: `architecture-*`, `bug-fix-*`, `config-*`, `convention-*`, `preference-*`,
+      `setup-*`, `api-*`, `meeting-*`, `research-*`, `snippet-*`, `hardware-*`, `protocol-*`.
+
+    Example: `personal-project/architecture-brainai-llm-model`.
+
+    ## Writing Guidance
+
+    - Capture facts that a fresh session in any agent would benefit from — not trivia.
+    - Always include the **why** (reasoning), concrete numbers, and versions.
+    - Prefer a few high-quality entries over many shallow ones.
+    - Start longer notes with a `[YYYY-MM-DD]` date and write in English for consistent retrieval.
+    - Do not save trivial fixes, temporary debugging state, or facts already documented in code.
     """
 
     static func splitFrontmatter(_ raw: String) -> (frontmatter: WikiFrontmatter, body: String) {

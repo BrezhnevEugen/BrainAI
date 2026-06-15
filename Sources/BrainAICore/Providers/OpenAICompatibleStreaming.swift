@@ -41,13 +41,15 @@ enum OpenAICompatibleStreaming {
     }
 
     /// Open a streaming chat completion and return a stream of content deltas.
+    /// - Parameter session: URLSession to use (injectable for testing).
     /// - Throws: on connection setup or a non-2xx HTTP status.
     static func chatStream(
         baseURL: String,
         apiKey: String,
         model: String,
         prompt: String,
-        options: GenerateOptions
+        options: GenerateOptions,
+        session: URLSession = .shared
     ) async throws -> AsyncStream<String> {
         guard let url = URL(string: baseURL.hasSuffix("/") ? "\(baseURL)chat/completions" : "\(baseURL)/chat/completions") else {
             throw HTTPClientError.invalidURL
@@ -69,7 +71,7 @@ enum OpenAICompatibleStreaming {
             )
         )
 
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
 
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             if http.statusCode == 401 { throw HTTPClientError.unauthorized }
