@@ -148,6 +148,21 @@ public final class WorkspaceManager: @unchecked Sendable {
         }
     }
 
+    /// Set a workspace's default memory domain.
+    public func setDomain(id: UUID, domain: String?) async throws {
+        try withLock {
+            guard let index = workspaces.firstIndex(where: { $0.id == id }) else {
+                throw BrainAIError.workspaceError("Workspace not found: \(id)")
+            }
+            let trimmed = domain?.trimmingCharacters(in: .whitespacesAndNewlines)
+            workspaces[index].domain = (trimmed?.isEmpty ?? true) ? nil : trimmed
+            if activeWorkspace?.id == id {
+                activeWorkspace?.domain = workspaces[index].domain
+            }
+        }
+        try await saveWorkspaces()
+    }
+
     /// Start a workspace's services
     /// - Parameter id: Workspace identifier
     public func start(id: UUID) async throws {
